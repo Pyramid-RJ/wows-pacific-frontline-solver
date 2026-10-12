@@ -16,10 +16,16 @@
 核心口径（用户确认的优化优先级）
 ─────────────────────────────────────────────────────────────────────
     P0 阶段目标达成（全歼口径，每场都要赢）
-    P1 进度代币收益最大化（只有关底 BOSS 掉落）
+    P1 进度代币收益最大化（**奖励为进度代币的据点**都要装「效率提升」，
+       其 +10% 对该据点的进度代币收益生效 —— 用户 2026-10-13 明确：
+       不限于关底 BOSS，任何掉进度代币的据点都吃这一加成；
+       程序按据点级 `is_progress`（圆牌为金色）判定，逐据点装）
     P2 为后续阶段尽可能预留高战力 → 用「已消耗我方战力总量最小」实现
     P3 低战力敌人不占用高战力卡 → 难易倒序 + 剪枝自然实现
-    P4 尽可能少用道具，但「效率提升」必须用（仅进度代币据点）
+    P4 尽可能少用道具（含特殊变项），但「效率提升」必须用（仅进度代币据点）
+    P5 特殊变项比卡牌更金贵（用户 2026-10-13）：特殊变项只能靠战斗奖励获得、
+       一次性；卡牌每次行动都会恢复 → 能用卡解决就别花特殊变项
+       （见 `stage_solve._maybe_no_spc` 与 `stage_gold_sufficient`）
 
 关键实现约定
 ─────────────────────────────────────────────────────────────────────
@@ -164,12 +170,33 @@ def node_saves_gold(node, labels=SAVE_GOLD_LABELS):
     return (node.get('difficulty_label') or '') in labels
 
 
+def stage_gold_sufficient(pool, nodes):
+    """本阶段的 3 级卡是否「够用」（用户 2026-10-13 口径）
+
+    判据：池里可用的 3 级卡 ≥ 该阶段据点各 4 张不同卡的需求（`4 × 据点数`）。
+
+    用途：**据点少、3 级卡够用时，优先花卡牌、少花特殊变项** ——
+    因为特殊变项只能靠战斗奖励获得（一次性），而卡牌每次行动都会恢复状态。
+    这类阶段的据点会先试「一门特殊变项都不花」的解。
+    （据点一多，3 级卡就不够每人 4 张，硬塞会挤掉后续阶段的硬仗 → 不启用。）
+    """
+    n_gold = sum(1 for c in (pool or [])
+                 if str(c.get('tier') or '').lower() in GOLD_TIERS)
+    return n_gold >= 4 * len(nodes or [])
+
+
 def node_prefers_no_spc(node, labels=SAVE_GOLD_LABELS):
     """该据点是否受「特殊变项预算」约束（4.30，用户口径）
 
     **低星关卡尽量少使用特殊变项，困难 / 关底不设限**。
     低星 = 难度 简单 / 普通；关底 = **掉进度代币**的据点（规则手册：只有关底
     BOSS 会掉落此类代币）→ 故判据 = 简单/普通 **且** 非关底。
+
+    ⚠ 2026-10-13：用户新口径把它**推广到了两类据点** ——
+    「特殊变项只能靠战斗奖励获得（一次性），卡牌每次行动都会恢复状态」，
+    所以（a）低星据点、以及（b）3 级卡够用的少据点阶段（`stage_gold_sufficient`）
+    里的据点，都先试「一门特殊变项都不花」的解，只有卡牌撑不住时才动特殊变项
+    （见 `stage_plan` 的 `inv_tries`）。
     """
     if (node.get('difficulty_label') or '') not in labels:
         return False
@@ -1753,6 +1780,8 @@ def stage_plan(pool, nodes, target=TARGET_RATE, use_local_search=True,
     用于「选阵时就计入每单位一门标准属性变项」（见 search_node）。
     """
     order = sorted(range(len(nodes)), key=lambda i: -nodes[i]['difficulty'])
+    # 「3 级卡够用」是**阶段级**属性（按本阶段起始池算一次，不随用卡浮动）
+    gold_ok = stage_gold_sufficient(pool, nodes)
     remaining = list(pool)
     plan, skipped = [], []
     for idx in order:
@@ -1776,8 +1805,17 @@ def stage_plan(pool, nodes, target=TARGET_RATE, use_local_search=True,
         # 变项，困难/关底不设限）：简单/普通且非关底的据点，先用「特殊变项
         # 一律不用」（库存里把它们清零）搜一轮 —— 达标就用它，把有限的**关卡
         # 掉落**变项留给硬仗；真的达标不了才放开（不牺牲达标）。
+        # 「先不花特殊变项」的适用范围（用户 2026-10-13 口径）：低星据点
+        # （简单/普通、非关底，4.30③）以及**3 级卡够用的少据点阶段**
+        # （`stage_gold_sufficient`）—— 后者是「据点少、金卡足够时，
+        # 宁可多花卡牌也不花特殊变项」，因为特殊变项只能靠战斗奖励获得
+        # （一次性），而卡牌每次行动都会恢复状态。
+        # 尝试顺序仍是「池优先于库存」：
+        #   (受限池, 无特殊) → (受限池, 有特殊) → (全池, 无特殊) → (全池, 有特殊)
+        # 「达标即停」保证不会为省变项而牺牲达标（先命中的达标解胜出）。
         inv_tries = []
-        if inv is not None and (frugal_all or node_prefers_no_spc(node)):
+        if inv is not None and (frugal_all or node_prefers_no_spc(node)
+                                or gold_ok):
             inv0 = inv_without_specials(inv)
             if inv0 != inv:
                 inv_tries.append((inv0, True))
@@ -1840,7 +1878,10 @@ def stage_solve(pool, nodes, inv, target=TARGET_RATE, uses_max=None,
                                                  target=target)
     if not save_gold or not any(not p['meets_target'] for p in plan) \
             or not any(p.get('gold_saved') for p in plan):
-        return plan, skipped, remaining, inv_left, uses_left, notes
+        return _maybe_no_spc(pool, nodes, plan, skipped, remaining,
+                             inv_left, uses_left, notes, inv, target,
+                             save_gold, final_stage, use_local_search,
+                             uses_max, frugal_all)
     plan2, skipped2, rem2 = stage_plan(
         pool, nodes, target=target, use_local_search=use_local_search,
         save_gold=False, final_stage=final_stage, inv=inv,
@@ -1850,7 +1891,51 @@ def stage_solve(pool, nodes, inv, target=TARGET_RATE, uses_max=None,
             > sum(1 for p in plan if p['meets_target']):
         notes2.insert(0, '⚠ 等级治理的结果在实装变项后不达标'
                       '（同阶段变项库存被其他据点分走）→ 已退回全池重排')
-        return plan2, skipped2, rem2, inv2, left2, notes2
+        return _maybe_no_spc(pool, nodes, plan2, skipped2, rem2,
+                             inv2, left2, notes2, inv, target,
+                             save_gold, final_stage, use_local_search,
+                             uses_max, frugal_all)
+    return _maybe_no_spc(pool, nodes, plan, skipped, remaining,
+                         inv_left, uses_left, notes, inv, target,
+                         save_gold, final_stage, use_local_search,
+                         uses_max, frugal_all)
+
+
+def _spc_used(plan):
+    """该方案用掉的特殊变项门数"""
+    return sum(len(p.get('spc') or []) for p in plan)
+
+
+def _maybe_no_spc(pool, nodes, plan, skipped, remaining, inv_left, uses_left,
+                  notes, inv, target, save_gold, final_stage,
+                  use_local_search, uses_max, frugal_all):
+    """「少花特殊变项」整段复算（用户 2026-10-13 口径）
+
+    特殊变项**只能靠战斗奖励获得（一次性）**，而卡牌每次行动都会恢复状态
+    —— 所以只要「整段一门特殊变项都不花」也能达到**同样多**的达标据点，
+    就应该用那一版（多花几张卡换来省下特殊变项）。
+
+    判据自带保险：只有 `达标数 不减少` 且 `特殊变项数 真的更少` 才替换 ——
+    金卡不够 / 卡池撑不住时，无特殊版会掉达标数，自然不会被采用。
+    因此不需要额外按「据点多少」设闸；`inv` 里没有特殊变项时整段跳过。
+    """
+    if inv is None or not _spc_used(plan):
+        return plan, skipped, remaining, inv_left, uses_left, notes
+    inv0 = inv_without_specials(inv)
+    if inv0 == inv:
+        return plan, skipped, remaining, inv_left, uses_left, notes
+    p0, sk0, rem0 = stage_plan(pool, nodes, target=target,
+                               use_local_search=use_local_search,
+                               save_gold=save_gold, final_stage=final_stage,
+                               inv=inv0, frugal_all=frugal_all)
+    i0, u0, n0 = plan_variations(p0, inv, uses_max, target=target)
+    met = lambda pl: sum(1 for p in pl if p['meets_target'])   # noqa: E731
+    if met(p0) >= met(plan) and 0 <= _spc_used(p0) < _spc_used(plan):
+        n0.insert(0, '· 少花特殊变项：整段改用「一门特殊变项都不花」的编队后'
+                     '达标据点不减少（%d→%d），特殊变项用量 %d→%d —— '
+                     '卡牌可恢复、特殊变项一次性，故优先省特殊变项'
+                     % (met(plan), met(p0), _spc_used(plan), _spc_used(p0)))
+        return p0, sk0, rem0, i0, u0, n0
     return plan, skipped, remaining, inv_left, uses_left, notes
 
 
