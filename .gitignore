@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 虚拟环境（用 requirements.txt 重建）
+.venv/
+
+# 调试图与实验脚本（临时产物，可由 code/ 重新生成）
+.work/
+
+# 大体积二进制：示例截图与模板可从原游戏重新截取
+data/stage/*.jpg
+data/icon_templates/
+
+# 临时投放目录（用户拖入的截图等），不入库
+input/
+
+# 保留关键数据（识别结果基线 + 字形模板体积小且必要）
+!data/stage/glyph_tpl.npz
+!data/stage/demo_recognition.json
+!data/our_fleet.json
+!data/weak_templates.json
+
+# 人工标注集（弱点识别评估基准，体积小且不可再生，必须入库）
+!data/weak_labeled/
+
+# 跨阶段运行状态（玩家本地产物，不入库）
+data/player_state.json
+data/plan.json
+data/panel.html
+data/input_editor.html
+data/player_input.json
+data/*.bak
+dist/
+
+# 编辑器
+.vscode/
+.idea/
+.DS_Store
+data/mygame_*/

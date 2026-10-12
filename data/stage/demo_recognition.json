@@ -1,0 +1,118 @@
+{
+  "kp1": {
+    "label": "普通据点示例1",
+    "cards": [
+      {
+        "idx": 1,
+        "power": 149,
+        "tier": "blue",
+        "token": 12
+      },
+      {
+        "idx": 2,
+        "power": 145,
+        "tier": "blue",
+        "token": 1
+      },
+      {
+        "idx": 3,
+        "power": 132,
+        "tier": "blue",
+        "token": 13
+      },
+      {
+        "idx": 4,
+        "power": 141,
+        "tier": "blue",
+        "token": 12
+      }
+    ]
+  },
+  "kp2": {
+    "label": "普通据点示例2",
+    "cards": [
+      {
+        "idx": 1,
+        "power": 83,
+        "tier": "white",
+        "token": 12
+      },
+      {
+        "idx": 2,
+        "power": 112,
+        "tier": "white",
+        "token": 12
+      },
+      {
+        "idx": 3,
+        "power": 114,
+        "tier": "white",
+        "token": 12
+      },
+      {
+        "idx": 4,
+        "power": 112,
+        "tier": "white",
+        "token": 13
+      }
+    ]
+  },
+  "kp3": {
+    "label": "普通据点示例3",
+    "cards": [
+      {
+        "idx": 1,
+        "power": 165,
+        "tier": "blue",
+        "token": 12
+      },
+      {
+        "idx": 2,
+        "power": 137,
+        "tier": "blue",
+        "token": 11
+      },
+      {
+        "idx": 3,
+        "power": 131,
+        "tier": "blue",
+        "token": 13
+      },
+      {
+        "idx": 4,
+        "power": 164,
+        "tier": "blue",
+        "token": 13
+      }
+    ]
+  },
+  "boss": {
+    "label": "关底 BOSS 据点",
+    "cards": [
+      {
+        "idx": 1,
+        "power": 164,
+        "tier": "gold",
+        "token": 600
+      },
+      {
+        "idx": 2,
+        "power": 191,
+        "tier": "gold",
+        "token": 650
+      },
+      {
+        "idx": 3,
+        "power": 227,
+        "tier": "red",
+        "token": 2400
+      },
+      {
+        "idx": 4,
+        "power": 208,
+        "tier": "gold",
+        "token": 600
+      }
+    ]
+  }
+}

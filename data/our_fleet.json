@@ -1,0 +1,850 @@
+{
+ "_meta": {
+  "desc": "我方 30 张卡牌结构化数据，来源为 doc/太平洋战线-规则手册.md 已核对表",
+  "fields": {
+   "id": "卡牌编号 1-30",
+   "name": "舰名",
+   "power": "总战力区间 [下限, 上限]",
+   "stats": "火力/生存/机动",
+   "tier": "卡牌等级档位 white/blue/gold/red → **白色 1级 / 蓝色 2级 / 金色 3级**。当前值按「战力区间分档」得到（≤125→white、130~165→blue、≥170→gold），**已由用户于 2026-10-10 逐张核对确认**。改等级直接改本文件的 tier，不要改代码。",
+   "debuff": "减益（红）槽位，type=弱点类型，dir=黑三角方向",
+   "buff": "增益（绿）槽位，type=属性，dir=仅 left/right",
+   "hp": "当前剩余生命值格数 3/2/1（0=不可部署）；默认 3，程序跨阶段累减"
+  },
+  "rules": {
+   "debuff_limit": "每个弱点最多被命中 3 次，第 3 次后达 -60%",
+   "stack": "不同弱点减益加算，理论上限 -120%",
+   "buff_dir": "增益仅 left/right，需友军并排"
+  }
+ },
+ "cards": [
+  {
+   "id": 1,
+   "name": "HELLDIVER俯冲轰炸机",
+   "power": [
+    170,
+    190
+   ],
+   "stats": [
+    75,
+    30,
+    75
+   ],
+   "debuff": [
+    {
+     "type": "攻击机",
+     "dir": "up"
+    }
+   ],
+   "buff": [
+    {
+     "type": "火力",
+     "dir": "left"
+    }
+   ],
+   "hp": 3,
+   "tier": "gold",
+   "type": "飞机"
+  },
+  {
+   "id": 2,
+   "name": "CORSAIR战斗机",
+   "power": [
+    170,
+    190
+   ],
+   "stats": [
+    55,
+    30,
+    95
+   ],
+   "debuff": [
+    {
+     "type": "防空火力",
+     "dir": "left"
+    },
+    {
+     "type": "攻击机",
+     "dir": "right"
+    }
+   ],
+   "buff": [],
+   "hp": 3,
+   "tier": "gold",
+   "type": "飞机"
+  },
+  {
+   "id": 3,
+   "name": "AVENGER鱼雷轰炸机",
+   "power": [
+    135,
+    155
+   ],
+   "stats": [
+    60,
+    25,
+    60
+   ],
+   "debuff": [
+    {
+     "type": "被侦察性",
+     "dir": "left"
+    },
+    {
+     "type": "攻击机",
+     "dir": "right"
+    }
+   ],
+   "buff": [],
+   "hp": 3,
+   "tier": "blue",
+   "type": "飞机"
+  },
+  {
+   "id": 4,
+   "name": "HELLCAT战斗机",
+   "power": [
+    130,
+    150
+   ],
+   "stats": [
+    35,
+    25,
+    80
+   ],
+   "debuff": [
+    {
+     "type": "攻击机",
+     "dir": "left"
+    },
+    {
+     "type": "防空火力",
+     "dir": "right"
+    }
+   ],
+   "buff": [],
+   "hp": 3,
+   "tier": "blue",
+   "type": "飞机"
+  },
+  {
+   "id": 5,
+   "name": "DAUNTLESS俯冲轰炸机",
+   "power": [
+    100,
+    120
+   ],
+   "stats": [
+    35,
+    20,
+    55
+   ],
+   "debuff": [
+    {
+     "type": "攻击机",
+     "dir": "up"
+    }
+   ],
+   "buff": [
+    {
+     "type": "火力",
+     "dir": "right"
+    }
+   ],
+   "hp": 3,
+   "tier": "white",
+   "type": "飞机"
+  },
+  {
+   "id": 6,
+   "name": "WILDCAT战斗机",
+   "power": [
+    90,
+    110
+   ],
+   "stats": [
+    20,
+    20,
+    60
+   ],
+   "debuff": [
+    {
+     "type": "防空火力",
+     "dir": "up"
+    }
+   ],
+   "buff": [
+    {
+     "type": "机动性",
+     "dir": "left"
+    }
+   ],
+   "hp": 3,
+   "tier": "white",
+   "type": "飞机"
+  },
+  {
+   "id": 7,
+   "name": "USS北卡罗来纳",
+   "power": [
+    180,
+    200
+   ],
+   "stats": [
+    80,
+    75,
+    35
+   ],
+   "debuff": [
+    {
+     "type": "大口径",
+     "dir": "left"
+    },
+    {
+     "type": "防空火力",
+     "dir": "right"
+    }
+   ],
+   "buff": [],
+   "hp": 3,
+   "tier": "gold",
+   "type": "战列舰"
+  },
+  {
+   "id": 8,
+   "name": "HMS英王乔治五世",
+   "power": [
+    145,
+    165
+   ],
+   "stats": [
+    60,
+    60,
+    35
+   ],
+   "debuff": [
+    {
+     "type": "被侦察性",
+     "dir": "right"
+    }
+   ],
+   "buff": [
+    {
+     "type": "火力",
+     "dir": "left"
+    }
+   ],
+   "hp": 3,
+   "tier": "blue",
+   "type": "战列舰"
+  },
+  {
+   "id": 9,
+   "name": "USS科罗拉多",
+   "power": [
+    140,
+    160
+   ],
+   "stats": [
+    65,
+    65,
+    20
+   ],
+   "debuff": [
+    {
+     "type": "防空火力",
+     "dir": "left"
+    },
+    {
+     "type": "大口径",
+     "dir": "up"
+    }
+   ],
+   "buff": [],
+   "hp": 3,
+   "tier": "blue",
+   "type": "战列舰"
+  },
+  {
+   "id": 10,
+   "name": "HMS反击",
+   "power": [
+    105,
+    125
+   ],
+   "stats": [
+    45,
+    35,
+    35
+   ],
+   "debuff": [
+    {
+     "type": "大口径",
+     "dir": "left"
+    }
+   ],
+   "buff": [
+    {
+     "type": "火力",
+     "dir": "right"
+    }
+   ],
+   "hp": 3,
+   "tier": "white",
+   "type": "战列舰"
+  },
+  {
+   "id": 11,
+   "name": "USS新墨西哥",
+   "power": [
+    105,
+    125
+   ],
+   "stats": [
+    50,
+    50,
+    15
+   ],
+   "debuff": [
+    {
+     "type": "大口径",
+     "dir": "right"
+    }
+   ],
+   "buff": [
+    {
+     "type": "火力",
+     "dir": "left"
+    }
+   ],
+   "hp": 3,
+   "tier": "white",
+   "type": "战列舰"
+  },
+  {
+   "id": 12,
+   "name": "USS阿拉斯加",
+   "power": [
+    170,
+    190
+   ],
+   "stats": [
+    65,
+    65,
+    50
+   ],
+   "debuff": [
+    {
+     "type": "被侦察性",
+     "dir": "left"
+    },
+    {
+     "type": "大口径",
+     "dir": "up"
+    }
+   ],
+   "buff": [],
+   "hp": 3,
+   "tier": "gold",
+   "type": "巡洋舰"
+  },
+  {
+   "id": 13,
+   "name": "USS巴尔的摩",
+   "power": [
+    170,
+    190
+   ],
+   "stats": [
+    65,
+    65,
+    50
+   ],
+   "debuff": [
+    {
+     "type": "被侦察性",
+     "dir": "right"
+    }
+   ],
+   "buff": [
+    {
+     "type": "火力",
+     "dir": "right"
+    }
+   ],
+   "hp": 3,
+   "tier": "gold",
+   "type": "巡洋舰"
+  },
+  {
+   "id": 14,
+   "name": "USS克利夫兰",
+   "power": [
+    135,
+    155
+   ],
+   "stats": [
+    45,
+    45,
+    55
+   ],
+   "debuff": [
+    {
+     "type": "速射",
+     "dir": "up"
+    }
+   ],
+   "buff": [
+    {
+     "type": "机动性",
+     "dir": "right"
+    }
+   ],
+   "hp": 3,
+   "tier": "blue",
+   "type": "巡洋舰"
+  },
+  {
+   "id": 15,
+   "name": "USS圣地亚哥",
+   "power": [
+    130,
+    150
+   ],
+   "stats": [
+    35,
+    35,
+    70
+   ],
+   "debuff": [
+    {
+     "type": "防空火力",
+     "dir": "up"
+    },
+    {
+     "type": "烟幕",
+     "dir": "right"
+    }
+   ],
+   "buff": [],
+   "hp": 3,
+   "tier": "blue",
+   "type": "巡洋舰"
+  },
+  {
+   "id": 16,
+   "name": "USS新奥尔良",
+   "power": [
+    130,
+    150
+   ],
+   "stats": [
+    45,
+    45,
+    50
+   ],
+   "debuff": [
+    {
+     "type": "大口径",
+     "dir": "left"
+    },
+    {
+     "type": "被侦察性",
+     "dir": "up"
+    }
+   ],
+   "buff": [],
+   "hp": 3,
+   "tier": "blue",
+   "type": "巡洋舰"
+  },
+  {
+   "id": 17,
+   "name": "HMAS霍巴特",
+   "power": [
+    95,
+    115
+   ],
+   "stats": [
+    30,
+    30,
+    45
+   ],
+   "debuff": [
+    {
+     "type": "速射",
+     "dir": "left"
+    }
+   ],
+   "buff": [
+    {
+     "type": "存活性",
+     "dir": "left"
+    }
+   ],
+   "hp": 3,
+   "tier": "white",
+   "type": "巡洋舰"
+  },
+  {
+   "id": 18,
+   "name": "USS马布尔黑德",
+   "power": [
+    90,
+    110
+   ],
+   "stats": [
+    30,
+    30,
+    40
+   ],
+   "debuff": [
+    {
+     "type": "烟幕",
+     "dir": "up"
+    },
+    {
+     "type": "速射",
+     "dir": "right"
+    }
+   ],
+   "buff": [],
+   "hp": 3,
+   "tier": "white",
+   "type": "巡洋舰"
+  },
+  {
+   "id": 19,
+   "name": "HR.MS德·鲁伊特",
+   "power": [
+    90,
+    110
+   ],
+   "stats": [
+    30,
+    30,
+    40
+   ],
+   "debuff": [
+    {
+     "type": "烟幕",
+     "dir": "left"
+    }
+   ],
+   "buff": [
+    {
+     "type": "机动性",
+     "dir": "left"
+    }
+   ],
+   "hp": 3,
+   "tier": "white",
+   "type": "巡洋舰"
+  },
+  {
+   "id": 20,
+   "name": "USS拉菲",
+   "power": [
+    170,
+    190
+   ],
+   "stats": [
+    55,
+    60,
+    65
+   ],
+   "debuff": [
+    {
+     "type": "烟幕",
+     "dir": "up"
+    }
+   ],
+   "buff": [
+    {
+     "type": "存活性",
+     "dir": "left"
+    }
+   ],
+   "hp": 3,
+   "tier": "gold",
+   "type": "驱逐舰"
+  },
+  {
+   "id": 21,
+   "name": "USS约翰斯顿",
+   "power": [
+    170,
+    190
+   ],
+   "stats": [
+    50,
+    60,
+    70
+   ],
+   "debuff": [
+    {
+     "type": "速射",
+     "dir": "left"
+    }
+   ],
+   "buff": [
+    {
+     "type": "存活性",
+     "dir": "right"
+    }
+   ],
+   "hp": 3,
+   "tier": "gold",
+   "type": "驱逐舰"
+  },
+  {
+   "id": 22,
+   "name": "USS基德",
+   "power": [
+    140,
+    160
+   ],
+   "stats": [
+    45,
+    45,
+    60
+   ],
+   "debuff": [
+    {
+     "type": "速射",
+     "dir": "right"
+    }
+   ],
+   "buff": [
+    {
+     "type": "存活性",
+     "dir": "right"
+    }
+   ],
+   "hp": 3,
+   "tier": "blue",
+   "type": "驱逐舰"
+  },
+  {
+   "id": 23,
+   "name": "USS本森",
+   "power": [
+    130,
+    150
+   ],
+   "stats": [
+    40,
+    40,
+    60
+   ],
+   "debuff": [
+    {
+     "type": "烟幕",
+     "dir": "up"
+    }
+   ],
+   "buff": [
+    {
+     "type": "机动性",
+     "dir": "left"
+    }
+   ],
+   "hp": 3,
+   "tier": "blue",
+   "type": "驱逐舰"
+  },
+  {
+   "id": 24,
+   "name": "凯旋",
+   "power": [
+    130,
+    150
+   ],
+   "stats": [
+    45,
+    30,
+    65
+   ],
+   "debuff": [
+    {
+     "type": "速射",
+     "dir": "left"
+    }
+   ],
+   "buff": [
+    {
+     "type": "机动性",
+     "dir": "right"
+    }
+   ],
+   "hp": 3,
+   "tier": "blue",
+   "type": "驱逐舰"
+  },
+  {
+   "id": 25,
+   "name": "USS休斯",
+   "power": [
+    100,
+    120
+   ],
+   "stats": [
+    30,
+    30,
+    50
+   ],
+   "debuff": [
+    {
+     "type": "速射",
+     "dir": "up"
+    },
+    {
+     "type": "烟幕",
+     "dir": "right"
+    }
+   ],
+   "buff": [],
+   "hp": 3,
+   "tier": "white",
+   "type": "驱逐舰"
+  },
+  {
+   "id": 26,
+   "name": "USS法拉格特",
+   "power": [
+    95,
+    115
+   ],
+   "stats": [
+    30,
+    30,
+    45
+   ],
+   "debuff": [
+    {
+     "type": "防空火力",
+     "dir": "left"
+    },
+    {
+     "type": "烟幕",
+     "dir": "right"
+    }
+   ],
+   "buff": [],
+   "hp": 3,
+   "tier": "white",
+   "type": "驱逐舰"
+  },
+  {
+   "id": 27,
+   "name": "HMS箭",
+   "power": [
+    90,
+    110
+   ],
+   "stats": [
+    30,
+    30,
+    40
+   ],
+   "debuff": [
+    {
+     "type": "被侦察性",
+     "dir": "up"
+    }
+   ],
+   "buff": [
+    {
+     "type": "存活性",
+     "dir": "right"
+    }
+   ],
+   "hp": 3,
+   "tier": "white",
+   "type": "驱逐舰"
+  },
+  {
+   "id": 28,
+   "name": "USS约翰·D·福特",
+   "power": [
+    90,
+    110
+   ],
+   "stats": [
+    30,
+    20,
+    50
+   ],
+   "debuff": [
+    {
+     "type": "烟幕",
+     "dir": "left"
+    }
+   ],
+   "buff": [
+    {
+     "type": "存活性",
+     "dir": "left"
+    }
+   ],
+   "hp": 3,
+   "tier": "white",
+   "type": "驱逐舰"
+  },
+  {
+   "id": 29,
+   "name": "HMAS吸血鬼",
+   "power": [
+    90,
+    110
+   ],
+   "stats": [
+    30,
+    20,
+    50
+   ],
+   "debuff": [
+    {
+     "type": "速射",
+     "dir": "right"
+    }
+   ],
+   "buff": [
+    {
+     "type": "机动性",
+     "dir": "right"
+    }
+   ],
+   "hp": 3,
+   "tier": "white",
+   "type": "驱逐舰"
+  },
+  {
+   "id": 30,
+   "name": "USS密苏里",
+   "power": [
+    190,
+    210
+   ],
+   "stats": [
+    80,
+    80,
+    40
+   ],
+   "debuff": [
+    {
+     "type": "被侦察性",
+     "dir": "up"
+    },
+    {
+     "type": "大口径",
+     "dir": "right"
+    }
+   ],
+   "buff": [],
+   "hp": 3,
+   "tier": "gold",
+   "type": "战列舰"
+  }
+ ]
+}

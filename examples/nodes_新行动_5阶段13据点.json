@@ -1,0 +1,1590 @@
+{
+ "_meta": {
+  "desc": "识别层（m11_plan.parse_node）对 13 张截图的产出；供求解核心独立复现",
+  "source": "data/mygame_s4",
+  "restore": "weak / weak_list 需转回 set 与列表，inventory 键需转 int（见 examples/solve_demo.py）"
+ },
+ "nodes": [
+  {
+   "name": "Snipaste_2026-10-12_00-16-26",
+   "cards": [
+    {
+     "power": 144,
+     "token": 13,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 149,
+     "token": 11,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 153,
+     "token": 13,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 121,
+     "token": 12,
+     "coin": "secondary",
+     "tier": "blue"
+    }
+   ],
+   "powers": [
+    144,
+    149,
+    153,
+    121
+   ],
+   "weak": [
+    [
+     "rapid",
+     "smoke"
+    ],
+    [
+     "rapid",
+     "smoke"
+    ],
+    [
+     "detect",
+     "largecal"
+    ],
+    [
+     "rapid",
+     "smoke"
+    ]
+   ],
+   "weak_list": [
+    [
+     "smoke",
+     "rapid"
+    ],
+    [
+     "smoke",
+     "rapid"
+    ],
+    [
+     "detect",
+     "largecal"
+    ],
+    [
+     "smoke",
+     "rapid"
+    ]
+   ],
+   "progress_tokens": 0,
+   "progress_cards": [],
+   "is_progress": false,
+   "difficulty": 567,
+   "stage": 1,
+   "node": 1,
+   "difficulty_label": "普通",
+   "star": 2,
+   "cond": {
+    "our_pairs": [
+     {
+      "attr": "增益效果",
+      "pct": -100,
+      "scope": "全域"
+     }
+    ],
+    "attr": "增益效果",
+    "pct": -100,
+    "scope": "全域",
+    "ban_types": [],
+    "ban_scope": null,
+    "directive": "每摧毁一个敌方单位可移除25%的战斗条件",
+    "ban_item": false
+   },
+   "disabled": [],
+   "inventory": {
+    "0": 7,
+    "1": 1,
+    "2": 2,
+    "3": 12,
+    "4": 7,
+    "5": 1,
+    "6": 4,
+    "7": 22,
+    "8": 6,
+    "9": 12,
+    "10": 22
+   },
+   "has_bar": true,
+   "mtime": 1791735389.2039146,
+   "review": [
+    "敌方1 代币读数低置信：13",
+    "敌方2 代币读数低置信：11",
+    "敌方3 代币读数低置信：13",
+    "敌方4 代币读数低置信：12"
+   ]
+  },
+  {
+   "name": "Snipaste_2026-10-12_00-16-33",
+   "cards": [
+    {
+     "power": 151,
+     "token": 17,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 136,
+     "token": 17,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 135,
+     "token": 14,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 147,
+     "token": 14,
+     "coin": "secondary",
+     "tier": "blue"
+    }
+   ],
+   "powers": [
+    151,
+    136,
+    135,
+    147
+   ],
+   "weak": [
+    [
+     "antiair",
+     "smoke"
+    ],
+    [
+     "rapid",
+     "smoke"
+    ],
+    [
+     "atkair",
+     "rapid"
+    ],
+    [
+     "rapid",
+     "smoke"
+    ]
+   ],
+   "weak_list": [
+    [
+     "antiair",
+     "smoke"
+    ],
+    [
+     "smoke",
+     "rapid"
+    ],
+    [
+     "rapid",
+     "atkair"
+    ],
+    [
+     "smoke",
+     "rapid"
+    ]
+   ],
+   "progress_tokens": 0,
+   "progress_cards": [],
+   "is_progress": false,
+   "difficulty": 569,
+   "stage": 1,
+   "node": 2,
+   "difficulty_label": "普通",
+   "star": 2,
+   "cond": {
+    "our_pairs": [],
+    "attr": "火力",
+    "pct": -24,
+    "scope": "区域",
+    "ban_types": [],
+    "ban_scope": null,
+    "directive": null,
+    "ban_item": false
+   },
+   "disabled": [],
+   "inventory": {
+    "0": 7,
+    "1": 1,
+    "2": 2,
+    "3": 12,
+    "4": 7,
+    "5": 1,
+    "6": 4,
+    "7": 22,
+    "8": 6,
+    "9": 12,
+    "10": 22
+   },
+   "has_bar": true,
+   "mtime": 1791735395.499177,
+   "review": [
+    "敌方1 代币读数低置信：17",
+    "敌方2 代币读数低置信：17",
+    "敌方4 代币读数低置信：14"
+   ]
+  },
+  {
+   "name": "Snipaste_2026-10-12_00-16-39",
+   "cards": [
+    {
+     "power": 111,
+     "token": 3,
+     "coin": "secondary",
+     "tier": "white"
+    },
+    {
+     "power": 100,
+     "token": 3,
+     "coin": "secondary",
+     "tier": "white"
+    },
+    {
+     "power": 111,
+     "token": 2,
+     "coin": "secondary",
+     "tier": "white"
+    },
+    {
+     "power": 119,
+     "token": 8,
+     "coin": "secondary",
+     "tier": "white"
+    }
+   ],
+   "powers": [
+    111,
+    100,
+    111,
+    119
+   ],
+   "weak": [
+    [
+     "rapid",
+     "smoke"
+    ],
+    [
+     "atkair",
+     "detect"
+    ],
+    [
+     "antiair",
+     "detect"
+    ],
+    [
+     "atkair",
+     "rapid"
+    ]
+   ],
+   "weak_list": [
+    [
+     "smoke",
+     "rapid"
+    ],
+    [
+     "detect",
+     "atkair"
+    ],
+    [
+     "antiair",
+     "detect"
+    ],
+    [
+     "rapid",
+     "atkair"
+    ]
+   ],
+   "progress_tokens": 0,
+   "progress_cards": [],
+   "is_progress": false,
+   "difficulty": 441,
+   "stage": 1,
+   "node": 3,
+   "difficulty_label": "简单",
+   "star": 2,
+   "cond": {
+    "our_pairs": [
+     {
+      "attr": "火力",
+      "pct": -24,
+      "scope": "指定"
+     }
+    ],
+    "attr": "火力",
+    "pct": -24,
+    "scope": "指定",
+    "ban_types": [],
+    "ban_scope": null,
+    "directive": "每摧毁一个敌方单位可移除6%的战斗条件",
+    "ban_item": false
+   },
+   "disabled": [],
+   "inventory": {
+    "0": 7,
+    "1": 1,
+    "2": 2,
+    "3": 12,
+    "4": 7,
+    "5": 1,
+    "6": 4,
+    "7": 22,
+    "8": 6,
+    "9": 12,
+    "10": 22
+   },
+   "has_bar": true,
+   "mtime": 1791735401.681496,
+   "review": [
+    "敌方1 代币读数低置信：3",
+    "敌方2 代币读数低置信：3",
+    "敌方3 代币读数低置信：2",
+    "敌方4 代币读数低置信：8"
+   ]
+  },
+  {
+   "name": "Snipaste_2026-10-12_00-16-51",
+   "cards": [
+    {
+     "power": 142,
+     "token": 13,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 152,
+     "token": 12,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 149,
+     "token": 12,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 135,
+     "token": 13,
+     "coin": "secondary",
+     "tier": "blue"
+    }
+   ],
+   "powers": [
+    142,
+    152,
+    149,
+    135
+   ],
+   "weak": [
+    [
+     "largecal",
+     "smoke"
+    ],
+    [
+     "largecal",
+     "smoke"
+    ],
+    [
+     "rapid",
+     "smoke"
+    ],
+    [
+     "antiair",
+     "detect"
+    ]
+   ],
+   "weak_list": [
+    [
+     "smoke",
+     "largecal"
+    ],
+    [
+     "smoke",
+     "largecal"
+    ],
+    [
+     "smoke",
+     "rapid"
+    ],
+    [
+     "antiair",
+     "detect"
+    ]
+   ],
+   "progress_tokens": 0,
+   "progress_cards": [],
+   "is_progress": false,
+   "difficulty": 578,
+   "stage": 2,
+   "node": 4,
+   "difficulty_label": "普通",
+   "star": 2,
+   "cond": {
+    "our_pairs": [
+     {
+      "attr": "增益效果",
+      "pct": -100,
+      "scope": "带入"
+     }
+    ],
+    "attr": "增益效果",
+    "pct": -100,
+    "scope": "带入",
+    "ban_types": [
+     "巡洋舰"
+    ],
+    "ban_scope": "全域",
+    "directive": "摧毁3个敌方单位以移除战斗条件",
+    "ban_item": false
+   },
+   "disabled": [],
+   "inventory": {
+    "0": 7,
+    "1": 1,
+    "2": 2,
+    "3": 12,
+    "4": 7,
+    "5": 1,
+    "6": 4,
+    "7": 22,
+    "8": 6,
+    "9": 12,
+    "10": 22
+   },
+   "has_bar": true,
+   "mtime": 1791735413.0270674,
+   "review": [
+    "敌方1 代币读数低置信：13",
+    "禁用舰种来自图标匹配（巡洋舰）（全域 段），建议抽检一次"
+   ]
+  },
+  {
+   "name": "Snipaste_2026-10-12_00-17-06",
+   "cards": [
+    {
+     "power": 131,
+     "token": 11,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 137,
+     "token": 13,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 130,
+     "token": 13,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 140,
+     "token": 13,
+     "coin": "secondary",
+     "tier": "blue"
+    }
+   ],
+   "powers": [
+    131,
+    137,
+    130,
+    140
+   ],
+   "weak": [
+    [
+     "atkair",
+     "rapid"
+    ],
+    [
+     "atkair",
+     "largecal"
+    ],
+    [
+     "rapid",
+     "smoke"
+    ],
+    [
+     "atkair",
+     "detect"
+    ]
+   ],
+   "weak_list": [
+    [
+     "rapid",
+     "atkair"
+    ],
+    [
+     "largecal",
+     "atkair"
+    ],
+    [
+     "smoke",
+     "rapid"
+    ],
+    [
+     "detect",
+     "atkair"
+    ]
+   ],
+   "progress_tokens": 0,
+   "progress_cards": [],
+   "is_progress": false,
+   "difficulty": 538,
+   "stage": 2,
+   "node": 5,
+   "difficulty_label": "普通",
+   "star": 2,
+   "cond": {
+    "our_pairs": [
+     {
+      "attr": "增益效果",
+      "pct": -100,
+      "scope": "带入"
+     }
+    ],
+    "attr": "增益效果",
+    "pct": -100,
+    "scope": "带入",
+    "ban_types": [],
+    "ban_scope": null,
+    "directive": null,
+    "ban_item": false
+   },
+   "disabled": [],
+   "inventory": {
+    "0": 7,
+    "1": 1,
+    "2": 2,
+    "3": 12,
+    "4": 7,
+    "5": 1,
+    "6": 4,
+    "7": 22,
+    "8": 6,
+    "9": 12,
+    "10": 22
+   },
+   "has_bar": true,
+   "mtime": 1791735428.0227506,
+   "review": [
+    "敌方1 代币读数低置信：11",
+    "敌方2 代币读数低置信：13",
+    "敌方3 代币读数低置信：13",
+    "敌方4 代币读数低置信：13"
+   ]
+  },
+  {
+   "name": "Snipaste_2026-10-12_00-17-12",
+   "cards": [
+    {
+     "power": 159,
+     "token": 16,
+     "coin": "secondary",
+     "tier": "gold"
+    },
+    {
+     "power": 186,
+     "token": 20,
+     "coin": "secondary",
+     "tier": "gold"
+    },
+    {
+     "power": 167,
+     "token": 16,
+     "coin": "secondary",
+     "tier": "gold"
+    },
+    {
+     "power": 190,
+     "token": 1,
+     "coin": "secondary",
+     "tier": "gold"
+    }
+   ],
+   "powers": [
+    159,
+    186,
+    167,
+    190
+   ],
+   "weak": [
+    [
+     "atkair",
+     "largecal"
+    ],
+    [
+     "atkair",
+     "largecal"
+    ],
+    [
+     "largecal"
+    ],
+    [
+     "atkair",
+     "largecal"
+    ]
+   ],
+   "weak_list": [
+    [
+     "largecal",
+     "atkair"
+    ],
+    [
+     "largecal",
+     "atkair"
+    ],
+    [
+     "largecal"
+    ],
+    [
+     "largecal",
+     "atkair"
+    ]
+   ],
+   "progress_tokens": 0,
+   "progress_cards": [],
+   "is_progress": false,
+   "difficulty": 702,
+   "stage": 2,
+   "node": 6,
+   "difficulty_label": "困难",
+   "star": 3,
+   "cond": {
+    "our_pairs": [
+     {
+      "attr": "火力",
+      "pct": -24,
+      "scope": "带入"
+     },
+     {
+      "attr": "增益效果",
+      "pct": -100,
+      "scope": "带入"
+     },
+     {
+      "attr": "火力",
+      "pct": -24,
+      "scope": "区域"
+     }
+    ],
+    "attr": "火力",
+    "pct": -24,
+    "scope": "区域",
+    "ban_types": [],
+    "ban_scope": null,
+    "directive": null,
+    "ban_item": false
+   },
+   "disabled": [],
+   "inventory": {
+    "0": 7,
+    "1": 1,
+    "2": 2,
+    "3": 12,
+    "4": 7,
+    "5": 1,
+    "6": 4,
+    "7": 22,
+    "8": 6,
+    "9": 12,
+    "10": 22
+   },
+   "has_bar": true,
+   "mtime": 1791735434.5837717,
+   "review": [
+    "敌方1 代币读数低置信：16",
+    "敌方3 代币读数低置信：16",
+    "敌方4 代币读数低置信：1",
+    "印章与条件文字冲突"
+   ]
+  },
+  {
+   "name": "Snipaste_2026-10-12_00-17-22",
+   "cards": [
+    {
+     "power": 114,
+     "token": 18,
+     "coin": "secondary",
+     "tier": "white"
+    },
+    {
+     "power": 114,
+     "token": 13,
+     "coin": "secondary",
+     "tier": "white"
+    },
+    {
+     "power": 104,
+     "token": 18,
+     "coin": "secondary",
+     "tier": "white"
+    },
+    {
+     "power": 108,
+     "token": 20,
+     "coin": "secondary",
+     "tier": "white"
+    }
+   ],
+   "powers": [
+    114,
+    114,
+    104,
+    108
+   ],
+   "weak": [
+    [
+     "atkair",
+     "smoke"
+    ],
+    [
+     "detect",
+     "largecal"
+    ],
+    [
+     "antiair",
+     "detect"
+    ],
+    [
+     "atkair",
+     "smoke"
+    ]
+   ],
+   "weak_list": [
+    [
+     "smoke",
+     "atkair"
+    ],
+    [
+     "detect",
+     "largecal"
+    ],
+    [
+     "antiair",
+     "detect"
+    ],
+    [
+     "smoke",
+     "atkair"
+    ]
+   ],
+   "progress_tokens": 0,
+   "progress_cards": [],
+   "is_progress": false,
+   "difficulty": 440,
+   "stage": 3,
+   "node": 7,
+   "difficulty_label": "简单",
+   "star": 1,
+   "cond": {
+    "our_pairs": [
+     {
+      "attr": "增益效果",
+      "pct": -100,
+      "scope": "带入"
+     }
+    ],
+    "attr": "增益效果",
+    "pct": -100,
+    "scope": "带入",
+    "ban_types": [
+     "巡洋舰"
+    ],
+    "ban_scope": "带入",
+    "directive": null,
+    "ban_item": false
+   },
+   "disabled": [],
+   "inventory": {
+    "0": 7,
+    "1": 1,
+    "2": 2,
+    "3": 12,
+    "4": 7,
+    "5": 1,
+    "6": 4,
+    "7": 22,
+    "8": 6,
+    "9": 12,
+    "10": 22
+   },
+   "has_bar": true,
+   "mtime": 1791735444.8290136,
+   "review": [
+    "敌方1 代币读数低置信：18",
+    "敌方2 代币读数低置信：13",
+    "敌方3 代币读数低置信：18",
+    "禁用舰种来自图标匹配（巡洋舰）（带入 段），建议抽检一次",
+    "印章与条件文字冲突"
+   ]
+  },
+  {
+   "name": "Snipaste_2026-10-12_00-17-30",
+   "cards": [
+    {
+     "power": 155,
+     "token": 4800,
+     "coin": "secondary",
+     "tier": "gold"
+    },
+    {
+     "power": 183,
+     "token": 4451,
+     "coin": "secondary",
+     "tier": "gold"
+    },
+    {
+     "power": 99,
+     "token": 1513,
+     "coin": "secondary",
+     "tier": "gold"
+    },
+    {
+     "power": 164,
+     "token": 3200,
+     "coin": "secondary",
+     "tier": "gold"
+    }
+   ],
+   "powers": [
+    155,
+    183,
+    99,
+    164
+   ],
+   "weak": [
+    [
+     "largecal"
+    ],
+    [
+     "atkair",
+     "largecal"
+    ],
+    [
+     "antiair"
+    ],
+    [
+     "atkair",
+     "detect"
+    ]
+   ],
+   "weak_list": [
+    [
+     "largecal"
+    ],
+    [
+     "largecal",
+     "atkair"
+    ],
+    [
+     "antiair"
+    ],
+    [
+     "detect",
+     "atkair"
+    ]
+   ],
+   "progress_tokens": 0,
+   "progress_cards": [],
+   "is_progress": false,
+   "difficulty": 601,
+   "stage": 3,
+   "node": 8,
+   "difficulty_label": "困难",
+   "star": 3,
+   "cond": {
+    "our_pairs": [
+     {
+      "attr": "增益效果",
+      "pct": -100,
+      "scope": "带入"
+     },
+     {
+      "attr": "存活性",
+      "pct": -12,
+      "scope": "区域"
+     },
+     {
+      "attr": "机动性",
+      "pct": -12,
+      "scope": "区域"
+     }
+    ],
+    "attr": "增益效果",
+    "pct": -100,
+    "scope": "区域",
+    "ban_types": [
+     "巡洋舰"
+    ],
+    "ban_scope": "带入",
+    "directive": null,
+    "ban_item": false
+   },
+   "disabled": [],
+   "inventory": {
+    "0": 7,
+    "1": 1,
+    "2": 2,
+    "3": 12,
+    "4": 7,
+    "5": 1,
+    "6": 4,
+    "7": 22,
+    "8": 6,
+    "9": 12,
+    "10": 22
+   },
+   "has_bar": true,
+   "mtime": 1791735452.5921042,
+   "review": [
+    "敌方1 代币读数低置信：4800",
+    "敌方2 代币读数低置信：4451",
+    "敌方3 代币读数低置信：1513",
+    "禁用舰种来自图标匹配（巡洋舰）（带入 段），建议抽检一次",
+    "印章与条件文字冲突"
+   ]
+  },
+  {
+   "name": "Snipaste_2026-10-12_00-17-36",
+   "cards": [
+    {
+     "power": 146,
+     "token": 75,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 150,
+     "token": 1,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 149,
+     "token": 1,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 164,
+     "token": 0,
+     "coin": "secondary",
+     "tier": "blue"
+    }
+   ],
+   "powers": [
+    146,
+    150,
+    149,
+    164
+   ],
+   "weak": [
+    [
+     "detect",
+     "largecal"
+    ],
+    [
+     "rapid",
+     "smoke"
+    ],
+    [
+     "largecal",
+     "smoke"
+    ],
+    [
+     "detect",
+     "rapid"
+    ]
+   ],
+   "weak_list": [
+    [
+     "detect",
+     "largecal"
+    ],
+    [
+     "smoke",
+     "rapid"
+    ],
+    [
+     "smoke",
+     "largecal"
+    ],
+    [
+     "detect",
+     "rapid"
+    ]
+   ],
+   "progress_tokens": 0,
+   "progress_cards": [],
+   "is_progress": false,
+   "difficulty": 609,
+   "stage": 3,
+   "node": 9,
+   "difficulty_label": "普通",
+   "star": 2,
+   "cond": {
+    "our_pairs": [
+     {
+      "attr": "增益效果",
+      "pct": -100,
+      "scope": "带入"
+     },
+     {
+      "attr": "减益效果",
+      "pct": -50,
+      "scope": "全域"
+     }
+    ],
+    "attr": "增益效果",
+    "pct": -100,
+    "scope": "带入",
+    "ban_types": [
+     "巡洋舰"
+    ],
+    "ban_scope": "带入",
+    "directive": "每摧毁一个敌方单位可移除12.5%的战斗条",
+    "ban_item": false
+   },
+   "disabled": [],
+   "inventory": {
+    "0": 7,
+    "1": 1,
+    "2": 2,
+    "3": 12,
+    "4": 7,
+    "5": 1,
+    "6": 4,
+    "7": 22,
+    "8": 6,
+    "9": 12,
+    "10": 22
+   },
+   "has_bar": true,
+   "mtime": 1791735458.3184566,
+   "review": [
+    "敌方1 代币读数低置信：75",
+    "敌方3 代币读数低置信：1",
+    "敌方4 代币读数低置信：0",
+    "禁用舰种来自图标匹配（巡洋舰）（带入 段），建议抽检一次"
+   ]
+  },
+  {
+   "name": "Snipaste_2026-10-12_00-17-42",
+   "cards": [
+    {
+     "power": 183,
+     "token": 2400,
+     "coin": "secondary",
+     "tier": "gold"
+    },
+    {
+     "power": 186,
+     "token": 1,
+     "coin": "secondary",
+     "tier": "gold"
+    },
+    {
+     "power": 156,
+     "token": 3000,
+     "coin": "secondary",
+     "tier": "gold"
+    },
+    {
+     "power": 217,
+     "token": 3000,
+     "coin": "secondary",
+     "tier": "gold"
+    }
+   ],
+   "powers": [
+    183,
+    186,
+    156,
+    217
+   ],
+   "weak": [
+    [
+     "antiair",
+     "smoke"
+    ],
+    [
+     "antiair",
+     "smoke"
+    ],
+    [
+     "atkair",
+     "detect"
+    ],
+    [
+     "antiair",
+     "smoke"
+    ]
+   ],
+   "weak_list": [
+    [
+     "antiair",
+     "smoke"
+    ],
+    [
+     "antiair",
+     "smoke"
+    ],
+    [
+     "detect",
+     "atkair"
+    ],
+    [
+     "antiair",
+     "smoke"
+    ]
+   ],
+   "progress_tokens": 0,
+   "progress_cards": [],
+   "is_progress": false,
+   "difficulty": 742,
+   "stage": 3,
+   "node": 10,
+   "difficulty_label": "困难",
+   "star": 3,
+   "cond": {
+    "our_pairs": [
+     {
+      "attr": "增益效果",
+      "pct": -100,
+      "scope": "带入"
+     }
+    ],
+    "attr": "增益效果",
+    "pct": -100,
+    "scope": "带入",
+    "ban_types": [
+     "巡洋舰"
+    ],
+    "ban_scope": "带入",
+    "directive": null,
+    "ban_item": false
+   },
+   "disabled": [],
+   "inventory": {
+    "0": 7,
+    "1": 1,
+    "2": 2,
+    "3": 12,
+    "4": 7,
+    "5": 1,
+    "6": 4,
+    "7": 22,
+    "8": 6,
+    "9": 12,
+    "10": 22
+   },
+   "has_bar": true,
+   "mtime": 1791735464.8184288,
+   "review": [
+    "敌方1 代币读数低置信：2400",
+    "禁用舰种来自图标匹配（巡洋舰）（带入 段），建议抽检一次",
+    "印章与条件文字冲突"
+   ]
+  },
+  {
+   "name": "Snipaste_2026-10-12_00-17-54",
+   "cards": [
+    {
+     "power": 151,
+     "token": 1,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 159,
+     "token": 1,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 152,
+     "token": 1,
+     "coin": "secondary",
+     "tier": "blue"
+    },
+    {
+     "power": 136,
+     "token": null,
+     "coin": "secondary",
+     "tier": "blue"
+    }
+   ],
+   "powers": [
+    151,
+    159,
+    152,
+    136
+   ],
+   "weak": [
+    [
+     "antiair",
+     "smoke"
+    ],
+    [
+     "detect",
+     "rapid"
+    ],
+    [
+     "atkair",
+     "smoke"
+    ],
+    [
+     "antiair",
+     "detect"
+    ]
+   ],
+   "weak_list": [
+    [
+     "antiair",
+     "smoke"
+    ],
+    [
+     "detect",
+     "rapid"
+    ],
+    [
+     "smoke",
+     "atkair"
+    ],
+    [
+     "antiair",
+     "detect"
+    ]
+   ],
+   "progress_tokens": 0,
+   "progress_cards": [],
+   "is_progress": false,
+   "difficulty": 598,
+   "stage": 4,
+   "node": 11,
+   "difficulty_label": "普通",
+   "star": 2,
+   "cond": {
+    "our_pairs": [
+     {
+      "attr": "减益效果",
+      "pct": -50,
+      "scope": "带入"
+     },
+     {
+      "attr": "增益效果",
+      "pct": -100,
+      "scope": "带入"
+     },
+     {
+      "attr": "存活性",
+      "pct": -12,
+      "scope": "指定"
+     },
+     {
+      "attr": "机动性",
+      "pct": -12,
+      "scope": "指定"
+     }
+    ],
+    "attr": "减益效果",
+    "pct": -50,
+    "scope": "指定",
+    "ban_types": [
+     "巡洋舰"
+    ],
+    "ban_scope": "带入",
+    "directive": "每摧毁一个敌方单位可移除3%的战斗条件",
+    "ban_item": false
+   },
+   "disabled": [],
+   "inventory": {
+    "0": 7,
+    "1": 1,
+    "2": 2,
+    "3": 12,
+    "4": 7,
+    "5": 1,
+    "6": 4,
+    "7": 22,
+    "8": 6,
+    "9": 12,
+    "10": 22
+   },
+   "has_bar": true,
+   "mtime": 1791735476.1737065,
+   "review": [
+    "敌方1 代币读数低置信：1",
+    "敌方2 代币读数低置信：1",
+    "敌方3 代币读数低置信：1",
+    "禁用舰种来自图标匹配（巡洋舰）（带入 段），建议抽检一次",
+    "印章与条件文字冲突"
+   ]
+  },
+  {
+   "name": "Snipaste_2026-10-12_00-18-01",
+   "cards": [
+    {
+     "power": 179,
+     "token": 435,
+     "coin": "secondary",
+     "tier": "gold"
+    },
+    {
+     "power": 177,
+     "token": 4343,
+     "coin": "secondary",
+     "tier": "gold"
+    },
+    {
+     "power": 182,
+     "token": 7,
+     "coin": "secondary",
+     "tier": "gold"
+    },
+    {
+     "power": 205,
+     "token": 1,
+     "coin": "secondary",
+     "tier": "gold"
+    }
+   ],
+   "powers": [
+    179,
+    177,
+    182,
+    205
+   ],
+   "weak": [
+    [
+     "atkair",
+     "detect"
+    ],
+    [
+     "atkair",
+     "detect"
+    ],
+    [
+     "detect"
+    ],
+    [
+     "largecal"
+    ]
+   ],
+   "weak_list": [
+    [
+     "detect",
+     "atkair"
+    ],
+    [
+     "detect",
+     "atkair"
+    ],
+    [
+     "detect"
+    ],
+    [
+     "largecal"
+    ]
+   ],
+   "progress_tokens": 0,
+   "progress_cards": [],
+   "is_progress": false,
+   "difficulty": 743,
+   "stage": 4,
+   "node": 12,
+   "difficulty_label": "困难",
+   "star": 3,
+   "cond": {
+    "our_pairs": [
+     {
+      "attr": "减益效果",
+      "pct": -50,
+      "scope": "带入"
+     },
+     {
+      "attr": "增益效果",
+      "pct": -100,
+      "scope": "带入"
+     }
+    ],
+    "attr": "减益效果",
+    "pct": -50,
+    "scope": "带入",
+    "ban_types": [
+     "巡洋舰"
+    ],
+    "ban_scope": "带入",
+    "directive": null,
+    "ban_item": false
+   },
+   "disabled": [],
+   "inventory": {
+    "0": 7,
+    "1": 1,
+    "2": 2,
+    "3": 12,
+    "4": 7,
+    "5": 1,
+    "6": 4,
+    "7": 22,
+    "8": 6,
+    "9": 12,
+    "10": 22
+   },
+   "has_bar": true,
+   "mtime": 1791735482.9286065,
+   "review": [
+    "敌方1 代币读数低置信：435",
+    "敌方2 代币读数低置信：4343",
+    "敌方3 代币读数低置信：7",
+    "敌方4 代币读数低置信：1",
+    "禁用舰种来自图标匹配（巡洋舰）（带入 段），建议抽检一次",
+    "印章与条件文字冲突"
+   ]
+  },
+  {
+   "name": "Snipaste_2026-10-12_00-18-13",
+   "cards": [
+    {
+     "power": 199,
+     "token": 1100,
+     "coin": "progress",
+     "tier": "gold"
+    },
+    {
+     "power": 250,
+     "token": 4750,
+     "coin": "progress",
+     "tier": "red"
+    },
+    {
+     "power": 190,
+     "token": null,
+     "coin": "secondary",
+     "tier": "gold"
+    },
+    {
+     "power": 183,
+     "token": 2,
+     "coin": "secondary",
+     "tier": "gold"
+    }
+   ],
+   "powers": [
+    199,
+    250,
+    190,
+    183
+   ],
+   "weak": [
+    [
+     "detect"
+    ],
+    [
+     "atkair"
+    ],
+    [
+     "largecal",
+     "smoke"
+    ],
+    [
+     "atkair",
+     "detect"
+    ]
+   ],
+   "weak_list": [
+    [
+     "detect"
+    ],
+    [
+     "atkair"
+    ],
+    [
+     "smoke",
+     "largecal"
+    ],
+    [
+     "detect",
+     "atkair"
+    ]
+   ],
+   "progress_tokens": 5850,
+   "progress_cards": [
+    1,
+    2
+   ],
+   "is_progress": true,
+   "difficulty": 822,
+   "stage": 5,
+   "node": 13,
+   "difficulty_label": "困难",
+   "star": 3,
+   "cond": {
+    "our_pairs": [
+     {
+      "attr": "存活性",
+      "pct": -12,
+      "scope": "带入"
+     },
+     {
+      "attr": "机动性",
+      "pct": -12,
+      "scope": "带入"
+     },
+     {
+      "attr": "减益效果",
+      "pct": -50,
+      "scope": "带入"
+     },
+     {
+      "attr": "增益效果",
+      "pct": -100,
+      "scope": "带入"
+     }
+    ],
+    "attr": "存活性",
+    "pct": -12,
+    "scope": "区域",
+    "ban_types": [
+     "巡洋舰"
+    ],
+    "ban_scope": "带入",
+    "directive": null,
+    "ban_item": false
+   },
+   "disabled": [],
+   "inventory": {
+    "0": 7,
+    "1": 1,
+    "2": 2,
+    "3": 12,
+    "4": 7,
+    "5": 1,
+    "6": 4,
+    "7": 22,
+    "8": 6,
+    "9": 12,
+    "10": 22
+   },
+   "has_bar": true,
+   "mtime": 1791735495.714133,
+   "review": [
+    "敌方1 代币读数低置信：1100",
+    "敌方2 代币读数低置信：4750",
+    "禁用舰种来自图标匹配（巡洋舰）（带入 段），建议抽检一次",
+    "印章与条件文字冲突"
+   ]
+  }
+ ]
+}

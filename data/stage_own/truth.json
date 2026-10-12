@@ -1,0 +1,110 @@
+{
+  "_meta": {
+    "desc": "data/stage_own/ 7 张玩家实拍的全字段人工真值（弱点/战力/进度代币/战斗条件/阶段面板/变项工具栏）。",
+    "source": "2026-10-11 人工标注：s2_kp4 ~ s4_kp7 逐字段放大截图判读；s1_kp1~3 的弱点此前已与 weak_labeled/1~3.png 逐枚核对（路线文档 4.11），s1 的工具栏/战力已在 4.1b 端到端实测中核对。",
+    "weak_rule": "每卡 1~2 枚弱点，按卡内从左到右排列；对比时按集合比较（程序输出顺序不保证）。",
+    "classes": {
+      "smoke": "烟幕",
+      "atkair": "攻击机",
+      "detect": "被侦察性",
+      "antiair": "防空",
+      "rapid": "速射",
+      "largecal": "大口径"
+    },
+    "icon_key": "三根细炮弹扇形=rapid；带尾环的单发细弹=smoke；粗炮管带速度线=largecal；螺旋桨机=atkair；同心圆=detect；三叉=antiair",
+    "star_note": "star = 当前据点标签上的星数（不是全面板最大值——s2_kp4 同屏可见 4★★/5★★★，旧实现误读 3）"
+  },
+  "images": {
+    "s1_kp1.png": {
+      "panel": { "stage": 1, "node": 1, "difficulty": "普通", "star": 2 },
+      "condition": { "attr": null, "pct": null, "scope": null, "directive": null, "ban_item": false },
+      "cards": [
+        { "power": 149, "weak": ["rapid", "smoke"] },
+        { "power": 145, "weak": ["atkair", "rapid"] },
+        { "power": 132, "weak": ["rapid", "smoke"] },
+        { "power": 141, "weak": ["antiair", "detect"] }
+      ],
+      "progress_tokens": 0,
+      "inventory": { "2": 1, "6": 5, "7": 12, "9": 7, "10": 13 },
+      "notes": "2375×1061，含我方卡组栏；灰色槽 [0,1,3,4,5,8]"
+    },
+    "s1_kp2.png": {
+      "panel": { "stage": 1, "node": 2, "difficulty": "简单", "star": 1 },
+      "condition": { "attr": "存活性", "pct": -24, "scope": "区域", "directive": null, "ban_item": false },
+      "cards": [
+        { "power": 83, "weak": ["largecal", "rapid"] },
+        { "power": 112, "weak": ["atkair", "largecal"] },
+        { "power": 114, "weak": ["atkair", "largecal"] },
+        { "power": 112, "weak": ["atkair", "largecal"] }
+      ],
+      "progress_tokens": 0,
+      "inventory": { "2": 1, "6": 5, "7": 12, "9": 7, "10": 13 },
+      "notes": "区域·存活性 −24%（视觉确认：标签栏 据点1★★/据点2★/据点3★★，当前据点2=1星）"
+    },
+    "s1_kp3.png": {
+      "panel": { "stage": 1, "node": 3, "difficulty": "普通", "star": 2 },
+      "condition": { "attr": null, "pct": null, "scope": null, "directive": null, "ban_item": false },
+      "cards": [
+        { "power": 165, "weak": ["antiair", "smoke"] },
+        { "power": 137, "weak": ["atkair", "detect"] },
+        { "power": 131, "weak": ["atkair", "rapid"] },
+        { "power": 164, "weak": ["detect", "rapid"] }
+      ],
+      "progress_tokens": 0,
+      "inventory": { "2": 1, "6": 5, "7": 12, "9": 7, "10": 13 },
+      "notes": ""
+    },
+    "s2_kp4.png": {
+      "panel": { "stage": 2, "node": 4, "difficulty": "普通", "star": 2 },
+      "condition": { "attr": null, "pct": null, "scope": "指定", "directive": "摧毁3个敌方单位以移除战斗条件", "ban_item": true },
+      "cards": [
+        { "power": 132, "weak": ["detect", "atkair"] },
+        { "power": 147, "weak": ["smoke", "rapid"] },
+        { "power": 149, "weak": ["detect", "rapid"] },
+        { "power": 152, "weak": ["detect", "rapid"] }
+      ],
+      "progress_tokens": 0,
+      "inventory": { "0": 1, "1": 1, "2": 2, "3": 1, "4": 2, "5": 1, "6": 5, "7": 12, "8": 2, "9": 7, "10": 13 },
+      "notes": "卡4 掉落为银色硬币柱 2400（非进度代币）；卡1~3 为硬币柱 1600/2000/2400 同款银灰色。星级视觉=★★（同屏据点5=★★★，旧实现误读 3）"
+    },
+    "s2_kp5.png": {
+      "panel": { "stage": 2, "node": 5, "difficulty": "困难", "star": 3 },
+      "condition": { "attr": null, "pct": null, "scope": null, "directive": null, "ban_item": false },
+      "cards": [
+        { "power": 210, "weak": ["smoke", "largecal"] },
+        { "power": 187, "weak": ["largecal"] },
+        { "power": 203, "weak": ["rapid", "atkair"] },
+        { "power": 156, "weak": ["largecal", "atkair"] }
+      ],
+      "progress_tokens": 0,
+      "inventory": { "0": 1, "1": 1, "2": 2, "3": 1, "4": 2, "5": 1, "6": 5, "7": 12, "8": 2, "9": 7, "10": 13 },
+      "notes": "卡1~3 掉落灰色箱体（15），卡4 绿包（1）—— 全部非进度代币；卡2（最上级）仅 1 枚弱点"
+    },
+    "s3_kp6.png": {
+      "panel": { "stage": 3, "node": 6, "difficulty": "困难", "star": 3 },
+      "condition": { "attr": null, "pct": null, "scope": null, "directive": null, "ban_item": false },
+      "cards": [
+        { "power": 192, "weak": ["antiair", "smoke"] },
+        { "power": 187, "weak": ["antiair", "detect"] },
+        { "power": 190, "weak": ["antiair", "smoke"] },
+        { "power": 166, "weak": ["antiair", "detect"] }
+      ],
+      "progress_tokens": 0,
+      "inventory": { "0": 1, "1": 1, "2": 2, "3": 1, "4": 2, "5": 1, "6": 6, "7": 12, "8": 2, "9": 7, "10": 14 },
+      "notes": "掉落为绿色特殊变项包（1/30/1/1），非进度代币；四卡全部含防空弱点"
+    },
+    "s4_kp7.png": {
+      "panel": { "stage": 4, "node": 7, "difficulty": "困难", "star": 3 },
+      "condition": { "attr": null, "pct": null, "scope": null, "directive": null, "ban_item": false },
+      "cards": [
+        { "power": 164, "weak": ["rapid", "atkair"] },
+        { "power": 191, "weak": ["rapid", "atkair"] },
+        { "power": 227, "weak": ["smoke", "largecal"] },
+        { "power": 208, "weak": ["largecal"] }
+      ],
+      "progress_tokens": 4250,
+      "inventory": { "0": 11, "1": 1, "2": 1, "3": 10, "4": 12, "5": 1, "6": 6, "7": 13, "8": 2, "9": 7, "10": 16 },
+      "notes": "BOSS 关底；金色圆牌 600+650+2400+600=4250（进度代币）；主要目标=妙高级、阶段目标=摧毁3个单位；卡3 卡面为蓝紫色"
+    }
+  }
+}

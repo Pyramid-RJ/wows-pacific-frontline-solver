@@ -1,0 +1,49 @@
+{
+  "_meta": {
+    "desc": "人工标注真值。images/ 下的 5 张选卡界面截图，每图 4 张卡，卡头含 2 枚弱点图标（5.png 第 2 卡仅 1 枚）。",
+    "source": "用户逐枚人工标注（截图内卡牌顺序，每卡从左到右）",
+    "term": "用户口语「烟雾/烟幕」统一为 smoke；「侦查/侦察」统一为 detect",
+    "image_quality": "PNG 容器但 8x8 块效应 9.4~10.2（完全无压缩原图为 6.0~6.9），像素内容本身来自已压缩源，评估结果存在上限",
+    "count": "5 图 / 20 卡 / 39 枚图标"
+  },
+  "classes": {
+    "smoke": "烟雾",
+    "atkair": "攻击机",
+    "detect": "被侦察",
+    "antiair": "防空",
+    "rapid": "速射",
+    "largecal": "大口径"
+  },
+  "images": {
+    "1.png": [
+      ["smoke", "rapid"],
+      ["rapid", "atkair"],
+      ["smoke", "rapid"],
+      ["antiair", "detect"]
+    ],
+    "2.png": [
+      ["largecal", "rapid"],
+      ["largecal", "atkair"],
+      ["largecal", "atkair"],
+      ["largecal", "atkair"]
+    ],
+    "3.png": [
+      ["antiair", "smoke"],
+      ["detect", "atkair"],
+      ["rapid", "atkair"],
+      ["detect", "rapid"]
+    ],
+    "4.png": [
+      ["detect", "atkair"],
+      ["smoke", "rapid"],
+      ["detect", "rapid"],
+      ["detect", "rapid"]
+    ],
+    "5.png": [
+      ["smoke", "largecal"],
+      ["largecal"],
+      ["rapid", "atkair"],
+      ["largecal", "atkair"]
+    ]
+  }
+}

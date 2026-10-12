@@ -1,0 +1,7 @@
+*.bat text eol=crlf
+# 发布包瘦身（git archive 排除；仓库内保留用于开发与回归）
+*.docx export-ignore
+doc/figures/ export-ignore
+data/stage_own/*.png export-ignore
+data/weak_labeled/images/ export-ignore
+data/stage_real/ export-ignore
