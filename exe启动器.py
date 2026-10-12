@@ -38,7 +38,8 @@ import traceback
 from pathlib import Path
 
 APP = '太平洋战线求解器'
-VERSION = '2026-10-13'
+RELEASE = 'v0.2'                      # 发布版本号（与 GitHub Release 标签一致）
+VERSION = '2026-10-13'                # 构建日期
 
 PAYLOAD_TOP = ('code', 'data', 'doc', 'examples')
 PAYLOAD_FILES = ('README.md', '使用说明.md', 'requirements.txt')
@@ -374,8 +375,9 @@ class Tasks:
         path = self.home / REPORT
         try:
             path.write_text(
-                '%s exe 便携版 %s\n自检时间：%s\n结果：%s\n%s\n'
-                % (APP, VERSION, _now(), '通过' if ok else '失败', '=' * 60)
+                '%s exe 便携版 %s（构建 %s）\n自检时间：%s\n结果：%s\n%s\n'
+                % (APP, RELEASE, VERSION, _now(),
+                   '通过' if ok else '失败', '=' * 60)
                 + ROUTER.text(), encoding='utf-8')
             print('自检报告：%s' % path)
         except Exception as e:                            # noqa: BLE001
@@ -400,7 +402,7 @@ class Portal:
 
         root = tk.Tk()
         self.root = root
-        root.title('%s（便携版 %s）' % (APP, VERSION))
+        root.title('%s（便携版 %s）' % (APP, RELEASE))
         root.configure(bg=BG)
         root.minsize(920, 640)
         root.geometry('980x700')
@@ -426,7 +428,8 @@ class Portal:
         bar.pack(fill='x', padx=18, pady=(16, 10))
         tk.Label(bar, text='太平洋战线 · 最优解求解器', bg=BG, fg=FG,
                  font=font_t).pack(side='left')
-        tk.Label(bar, text='  便携版', bg=BG, fg=ACC, font=font_s).pack(side='left')
+        tk.Label(bar, text='  便携版 %s' % RELEASE, bg=BG, fg=ACC,
+                 font=font_s).pack(side='left')
         tk.Button(bar, text='使用说明', bg=BG, fg=DIM, font=font_s, bd=0,
                   activebackground=BG, activeforeground=FG, cursor='hand2',
                   command=self.act_readme).pack(side='right')
@@ -738,7 +741,7 @@ def main(argv):
         print(app_home())
         return 0
     if argv and argv[0] == 'version':
-        print('%s exe 便携版 %s' % (APP, VERSION))
+        print('%s exe 便携版 %s（构建 %s）' % (APP, RELEASE, VERSION))
         return 0
 
     home = app_home()
