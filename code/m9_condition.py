@@ -49,6 +49,11 @@ SEAL_FILL_MAX = 0.12   # 印章填充率上限（几何判定）
 DIFFS = ('普通', '简单', '困难')
 ATTRS = ('存活性', '火力', '机动性', '被侦察性', '战力',
          '增益效果', '减益效果')
+# 敌方侧属性：面板上写作「敌方战力 +8%」，与**我方**的「战力 −X%」是两回事
+# （前者是敌方加成，后者是我方总战力削弱）。旧实现只按子串匹配 ATTRS，把它
+# 读成「战力」并走我方全参数通道（m11.cond_all_pct）—— 当它落在「区域」段时
+# 会把我方参数凭空虚增 8%。2026-10-13 拆成独立属性，只由 m11 按敌方口径处理。
+ENEMY_ATTR = '敌方战力'
 SCOPES = ('全场', '区域', '指定', '带入', '全域')
 _PCT = re.compile(r'([+\-−]?\d+)\s*%')
 
@@ -230,13 +235,17 @@ def seal_geometry(panel):
 
 # ---------- 语义层：OCR ----------
 def _read_panel(panel):
-    """对面板跑一次 OCR，返回 [{'y','x','text','conf'}]"""
+    """对面板跑一次 OCR，返回 [{'y','x','h','w','text','conf'}]"""
     res, _ = _ocr_engine()(panel.astype(np.uint8))
     out = []
     for box, txt, conf in (res or []):
+        xs = [p[0] for p in box]
+        ys = [p[1] for p in box]
         out.append({
-            'y': int(min(p[1] for p in box)),
-            'x': int(min(p[0] for p in box)),
+            'y': int(min(ys)),
+            'x': int(min(xs)),
+            'h': int(max(ys) - min(ys)),
+            'w': int(max(xs) - min(xs)),
             'text': txt.strip(),
             'conf': float(conf),
         })
@@ -324,6 +333,20 @@ def _region_items(items, panel_h):
     return [i for i in items if ya <= i['y'] <= yb]
 
 
+def attr_in_text(t):
+    """条件行文字 → 属性名（含敌方侧「敌方战力」）；无则 None
+
+    「敌方战力」必须**先判**：ATTRS 里的 '战力' 会按子串命中它。
+    OCR 偶把「敌方战力」读成「敌战力 / 敌方战刀」（实测窄带 1x），
+    故凡以「敌」开头且含「战力」者都算敌方侧 —— 既不让我方侧通道误收，
+    也让 m11 能识别出这条显示加成。
+    """
+    tt = _norm(t).replace(' ', '')
+    if ENEMY_ATTR in tt or (tt.startswith('敌') and '战力' in tt):
+        return ENEMY_ATTR
+    return next((a for a in ATTRS if a in tt), None)
+
+
 def _attr_pairs(cond_items):
     """条件区 OCR 行 → [{'attr','pct','scope'}] 逐行配对（多行属性削弱）
 
@@ -344,7 +367,7 @@ def _attr_pairs(cond_items):
         if t in SCOPES:
             scope = t
             continue
-        attr = next((a for a in ATTRS if a in t), None)
+        attr = attr_in_text(t)
         if attr is None:
             continue
         m = _PCT.search(t)
@@ -360,6 +383,85 @@ def _attr_pairs(cond_items):
         if p is not None:
             pairs.append({'attr': attr, 'pct': p, 'scope': scope})
     return pairs
+
+
+def _rescue_missing_attrs(path, panel, cond):
+    """条件行「属性名漏读」的逐行窄带重读（2026-10-13）
+
+    整块条件区 OCR 会把「火力」读成「力」—— 尤见于玩家高分辨率截图被
+    入口归一化到 1920 基准之后（实测 2270×931 的 1945 行动截图，
+    区域·火力−24% 只读出「-24%」，属性名丢失）。丢名的那一行 m11
+    既折不了、也不报警告以外的东西，等于**静默漏折算**（胜率偏乐观）。
+    实测把该行**单独裁成窄带**、按**原始分辨率**放大 3x 再 OCR，即可稳定
+    读回「火力」（整块重读做不到，与缩放无关，是行分组的问题）。
+
+    兜底原则（宁缺勿错）：
+      · 只在该行**本来就没有属性名**时用（绝不覆盖已读出的属性）；
+      · 窄带取自百分比行自己 OCR 框的上下沿（不外扩到相邻行）；
+      · 重读结果必须**只命中唯一一个属性**，否则放弃（交人工确认）。
+
+    返回 (extra_pairs, notes)；extra_pairs 每条带 `_rescued: True`。
+    """
+    import numpy as np
+    from PIL import Image
+
+    pcts = [i for i in cond if _PCT.search(_norm(i['text']))]
+    if not pcts:
+        return [], []
+    named = [i for i in cond if attr_in_text(i['text'])]
+    ph = panel.shape[0]
+    nat = load(path)
+    npanel = nat[:, int(nat.shape[1] * PANEL_X):]
+    sy = npanel.shape[0] / float(ph)
+    # 用「两者中更大」的那一份：截图比 1920 基准大 → 原始分辨率更清晰；
+    # 比基准小（实测 s5 为 1710 宽）→ 归一化后的那份才是放大过的。
+    if sy >= 1.0:
+        base, ymap, hmap = npanel, (lambda y: int(round(y * sy))), sy
+    else:
+        base, ymap, hmap = panel, (lambda y: int(y)), 1.0
+    base = np.asarray(base).astype('uint8')
+    pairs, notes = [], []
+    for p in pcts:
+        txt = _norm(p['text'])
+        if '摧毁' in txt or '移除' in txt:
+            continue                      # 指令行（「每摧毁…可移除 X%」）本就无属性名
+        if any(abs(a['y'] - p['y']) <= 10 for a in named):
+            continue                      # 本行已有属性名
+        yn = ymap(p['y'])
+        # 窄带几何：**固定 26px**（在 base 自己的像素尺度上，不再按 sy 放大），
+        # 落点比该行 OCR 框顶再高 6px。实测高度是关键 —— 用 OCR 框自带高度
+        # （实测 35px）或按 sy 放大 26px（实测 31px）都会把相邻行切进来，
+        # 识别随即退化成「力」；正好 26px 才是稳定读出「火力」的那一档。
+        band = base[max(0, yn - 6):min(base.shape[0], yn + 20), :]
+        if band.size == 0:
+            continue
+        big = np.array(Image.fromarray(band).resize(
+            (band.shape[1] * 3, band.shape[0] * 3), Image.LANCZOS))
+        res, _ = _ocr_engine()(big)
+        got = set()
+        for _b, t2, cf in (res or []):
+            if float(cf) < 0.6:
+                continue
+            a = attr_in_text(t2)
+            if a:
+                got.add(a)
+        if len(got) != 1:
+            continue                      # 读不出或多义 → 交人工确认
+        m = _PCT.search(txt)
+        if not m:
+            continue
+        attr = got.pop()
+        sc = _scope_above(cond, p['y'])
+        pairs.append({'attr': attr, 'pct': int(m.group(1)), 'scope': sc,
+                      '_rescued': True})
+        if sc in (None, '区域') or attr == ENEMY_ATTR:
+            # 只有真正影响结果的补出才提示抽检：区域 / 未读出作用域 的行会折算
+            # 进胜率；「敌方战力 ±X%」无论挂在哪一段都会参与基础值反推。
+            # 带入 / 全域 / 指定 的普通属性行按口径不折算，补出来只为显示完整。
+            notes.append('条件行属性名漏读，按逐行重读补出：%s %s%%（%s）'
+                         '—— 建议抽检一次'
+                         % (attr, m.group(1), sc or '未读出作用域'))
+    return pairs, notes
 
 
 def parse(path, ocr=True):
@@ -420,7 +522,19 @@ def parse(path, ocr=True):
 
     # 多行属性削弱：全部 (attr, pct, scope) 配对（按作用域标题行分节、逐行配对）
     out['our_pairs'] = _attr_pairs(cond)
-    # 属性 + 百分比（attr 含「战力」= 总战力削弱，由 m11 按全参数折算）
+    # 属性名漏读的行 → 逐行窄带重读兜底（2026-10-13；整块 OCR 会把
+    # 「火力」读成「力」，实测 1945 行动的 区域·火力−24% 整条静默丢失）
+    rescued, rescue_notes = _rescue_missing_attrs(path, panel, cond)
+    if rescued:
+        have = {(pr.get('attr'), pr.get('scope')) for pr in out['our_pairs']}
+        for pr in rescued:
+            if (pr['attr'], pr['scope']) not in have:
+                out['our_pairs'].append(pr)
+                have.add((pr['attr'], pr['scope']))
+    out['rescued'] = [{'attr': pr['attr'], 'pct': pr['pct'],
+                       'scope': pr['scope']} for pr in rescued]
+    # 属性 + 百分比（attr 含「战力」= 总战力削弱，敌方侧「敌方战力」单列，
+    # 由 m11 按敌方口径处理）
     # ⚠ 兼容字段优先取**第一个配对**：配对是「同一 OCR 行内」的属性+百分比，
     #   杜绝跨节错配。旧的单值路径（ctext 里第一个属性名 + 第一个百分比）两者
     #   可能来自不同分节 —— 实测 13-56-44 的「区域·增益效果 −100%｜全域·火力 −12%」
@@ -429,7 +543,7 @@ def parse(path, ocr=True):
         out['attr'] = out['our_pairs'][0]['attr']
         out['pct'] = out['our_pairs'][0]['pct']
     else:
-        out['attr'] = next((s for s in ATTRS if s in ctext), None)
+        out['attr'] = attr_in_text(ctext)
         mp = _PCT.search(ctext)
         out['pct'] = int(mp.group(1)) if mp else None
     out['scope'] = next((s for s in SCOPES if s in ctext), None)
@@ -456,8 +570,14 @@ def parse(path, ocr=True):
     # 冲突校验：几何说有印章，OCR 却读到属性/指令 → 需人工确认
     review = []
     review.extend(ban_review)
+    review.extend(rescue_notes)
     if out['has_seal'] and (out['attr'] or out['directive']):
-        review.append('印章与条件文字冲突')
+        # 几何印章（虚线框）判定在「条件区没有深色高亮指令行」时会误报 ——
+        # 实测 1945 行动的据点8~13（条件全挂在「带入」段、无深色指令行，
+        # 暗像素分布稀疏 → 被判成印章）。读到条件文字时**以文字为准**，
+        # 这里只提示抽检一次，不必当成冲突。
+        review.append('几何印章判定与条件文字并存（无深色指令行时印章易误报；'
+                      '本次以文字为准，建议抽检一次）')
     if not out['has_seal'] and not (out['attr'] or out['directive']
                                     or out['ban_item']):
         review.append('无印章但也无条件文字')
