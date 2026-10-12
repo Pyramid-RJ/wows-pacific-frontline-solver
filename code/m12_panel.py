@@ -152,6 +152,14 @@ for (const n of D.nodes){
   card.appendChild(head);
   // 敌方 + 掉落
   let meta = '敌方战力 <b>' + n.enemy_powers.join(' / ') + '</b>';
+  // 新增可选字段（2026-10-13）：面板绿字值（= 含「带入」敌方战力加成）
+  // 与战斗基础值的对照，缺这两个键时完全不影响渲染
+  if (n.enemy_powers_displayed && n.enemy_power_pct) {
+    const dp = Math.round((n.enemy_power_pct.displayed || 0) * 100);
+    meta += ' <span class="tag">面板绿字 '
+      + n.enemy_powers_displayed.join(' / ') + '（带入条件 '
+      + (dp > 0 ? '+' : '') + dp + '%% 已反推为上面的基础值）</span>';
+  }
   if (n.is_progress)
     meta += ' · 进度代币 <b>' + n.progress_tokens + '</b>';
   card.appendChild(el('div', 'meta', meta));

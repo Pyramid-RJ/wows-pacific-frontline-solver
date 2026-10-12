@@ -448,7 +448,7 @@ def parse_node(name, path, ocr=True, need_weak=True, banned=None,
     prog_idx = [i for i, c in enumerate(cards) if c['coin'] == 'progress']
     prog = sum(cards[i]['token'] or 0 for i in prog_idx)
 
-    return {
+    n = {
         'name': name,
         'cards': cards,
         'powers': powers,
@@ -477,6 +477,17 @@ def parse_node(name, path, ocr=True, need_weak=True, banned=None,
         'mtime': os.path.getmtime(path),
         'review': review + list(cond.get('needs_review') or []),
     }
+    # 「敌方战力 ±X%」：面板给的是**含「带入」加成**的值，战斗用基础值
+    # （2026-10-13 实拍对照，见 enemy_pct_of 的口径说明）。
+    shown, battle = cond_enemy_pct(n)
+    if shown or battle:
+        n['powers_displayed'] = list(powers)          # 面板原值（绿字）
+        n['powers'] = [None if p is None else
+                       int(round(p / (1.0 + shown) * (1.0 + battle)))
+                       for p in powers]
+        n['enemy_pct'] = {'displayed': round(shown, 4), 'battle': round(battle, 4)}
+        n['difficulty'] = sum(p or 0 for p in n['powers'])
+    return n
 
 
 # ============ 3. 变项身份映射（用户配置） ============
@@ -674,6 +685,65 @@ def cond_all_pct(node):
     if c.get('attr') == '战力' and c.get('pct'):
         return c['pct'] / 100.0
     return 0.0
+
+
+# 敌方侧属性名（与 m9_condition.ENEMY_ATTR 同名；此处写字面量，
+# 让 m11 不硬依赖识别层模块）
+ENEMY_ATTR = '敌方战力'
+
+
+def enemy_pct_of(cond):
+    """「敌方战力 ±X%」条件 → (面板显示比例, 战斗生效比例)
+
+    与 `cond_all_pct` 严格区分：`cond_all_pct` 处理的是**我方**的
+    「战力 −X%」（我方总战力被削）；「敌方战力 ±X%」是**敌方侧**加成，
+    面板上是另一行（`m9_condition.ENEMY_ATTR`）。旧实现只按子串匹配，
+    把后者读成「战力」并走我方通道 —— 一旦它落在区域段，我方参数会
+    凭空虚增 8%。2026-10-13 拆开。
+
+    **面板值 ≠ 战斗值**（1945 行动 13 张截图实拍 + 部署界面对照得出）：
+
+      · 据点5 把「敌方战力 +8%」挂在**全域**段 —— 其自身面板战力求为
+        黑色（= 基础值），与该据点部署界面逐格吻合 → 全域段不改显示；
+      · 据点8~13 该条件挂在**带入**段，面板战力为**绿色**（= 已加成），
+        而部署界面上的数字正是 面板值 ÷ 1.08（据点8/9 共 8 个数字逐一吻合，
+        且减益步长仍是干净的 −20%：165×0.6=99、140×0.8=112…）→
+        「带入」的敌方加成只进了**地图/面板展示**，**战斗用未加成的基础值**。
+
+    口径（用户 2026-10-13 指定「读带入战斗条件里的敌方战力加成反推初始值」）：
+
+        base      = 面板值 ÷ (1 + Σ带入)      # 反推出的初始（战斗）战力
+        battle    = base × (1 + Σ区域)         # 区域=永久，参战生效
+
+    返回 (displayed, battle) 两个比例（如 0.08 / 0.0）。
+    ⚠ 未知项：若「敌方战力」挂在**区域**段（目前三套数据与 1945 行动
+    都没有这种样例），这里按「区域 = 永久生效」推算为战斗加成；
+    若日后实测表明区域加成也进了面板显示，改这一处即可。
+    """
+    cond = cond or {}
+    pairs = cond.get('our_pairs') or []
+    shown = battle = 0.0
+    seen = False
+    for pr in pairs:
+        if pr.get('attr') != ENEMY_ATTR or not pr.get('pct'):
+            continue
+        seen = True
+        if pr.get('scope') == '带入':
+            shown += pr['pct'] / 100.0
+        if pr.get('scope') in (None, '区域'):
+            battle += pr['pct'] / 100.0
+    if not seen and cond.get('attr') == ENEMY_ATTR and cond.get('pct'):
+        sc = cond.get('scope')
+        if sc == '带入':
+            shown += cond['pct'] / 100.0
+        if sc in (None, '区域'):
+            battle += cond['pct'] / 100.0
+    return shown, battle
+
+
+def cond_enemy_pct(node):
+    """节点级入口：见 `enemy_pct_of`（取 node['cond']）"""
+    return enemy_pct_of(node.get('cond') or {})
 
 
 def cond_ban_types(node):
@@ -1891,6 +1961,12 @@ def format_plan(plan, pool, remaining, nodes, inp, uses_max, uses_left,
             cond = '战斗条件：无'
         L.append('%s（%s）' % (n['name'], ' · '.join(flags) or '—'))
         L.append('  敌方战力 %s · 难度 %d' % (n['powers'], n['difficulty']))
+        if n.get('powers_displayed'):
+            _ep = n.get('enemy_pct') or {}
+            L.append('    （面板绿字显示 %s，已按「带入」敌方战力加成 %+d%% '
+                     '反推出基础值；战斗用基础值）'
+                     % (n['powers_displayed'],
+                        round((_ep.get('displayed') or 0) * 100)))
         L.append('  %s' % cond)
         wl = n.get('weak_list') or []
         if wl:
@@ -2103,6 +2179,14 @@ def plan_to_json(inp, plan, remaining, uses_max, uses_left, notes,
             'difficulty': n['difficulty'],
             'difficulty_label': n.get('difficulty_label'),
             'enemy_powers': list(n['powers']),
+            # 新增可选字段（2026-10-13）：面板 OCR 到的原始战力（= 已含
+            # 「带入」敌方战力加成，绿字显示）与反推出的基础值对照。
+            # 只有该据点的「敌方战力 ±X%」挂在「带入」段时才有这两个键 ——
+            # `enemy_powers` 是**战斗口径**（基础值），界面若要复刻面板绿字
+            # 请用 `enemy_powers_displayed`。
+            **({'enemy_powers_displayed': list(n['powers_displayed']),
+                'enemy_power_pct': dict(n['enemy_pct'])}
+               if n.get('powers_displayed') else {}),
             'condition': {'attr': c.get('attr'), 'pct': c.get('pct'),
                           'scope': c.get('scope'),
                           'directive': c.get('directive'),

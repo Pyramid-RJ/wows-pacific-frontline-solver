@@ -19,7 +19,7 @@ from m11_plan import (HP_MAX, TARGET_RATE, power_from_stats, build_pool,
                       inventory_by_name, stage_plan, plan_variations,
                       min_rate, local_search, _objective, eval_cards,
                       cond_pct, has_cond, cond_all_pct, cond_ban_types,
-                      cond_buff_suppress,
+                      cond_buff_suppress, enemy_pct_of, cond_enemy_pct,
                       search_node, plan_to_json, plan_all_stages,
                       save_state, load_state, snapshot_of, rollback,
                       list_snapshots, load_player_input, apply_banned_types,
@@ -559,7 +559,9 @@ def t_all_stages():
 
 def t_cond_types():
     print('\n== 9b. 条件五类建模：战力削弱 + 禁用舰种（用户 2026-10-11 口径） ==')
-    # 口径前提：敌方侧条件加成已直接体现在截图战力数字里，程序不重复计算
+    # 口径前提：敌方侧**属性/舰种**加成已体现在截图战力数字里，程序不重复计算；
+    # 但「敌方战力 ±X%」走独立通道（enemy_pct_of，见 t_enemy_power），
+    # 因为它只进了**面板显示值**、战斗用基础值 —— 2026-10-13 实拍对照修正。
     ck(validate_fleet(load_fleet()) == [], '舰种数据注入后卡库仍可校验')
     types = {c['type'] for c in load_fleet()}
     ck(types == {'驱逐舰', '巡洋舰', '战列舰', '飞机'}, '30 张卡覆盖 4 舰种')
@@ -1549,6 +1551,36 @@ def t_trim():
        and left5 is None, '无变项据点：不受影响（仍达标、库存/次数不动）')
 
 
+def t_enemy_power():
+    print('\n== 9j. 「敌方战力 ±X%」面板显示 vs 战斗值（2026-10-13 实拍对照） ==')
+    # 据点8 形状：带入段「敌方战力 +8%」→ 面板绿字 173/178/151/170 是**含加成**的，
+    # 部署界面（真实战斗）为 160/165/140/157 = 面板 ÷ 1.08
+    n8 = {'cond': {'our_pairs': [{'attr': '敌方战力', 'pct': 8, 'scope': '带入'},
+                                 {'attr': '机动性', 'pct': -36, 'scope': '带入'}]}}
+    ck(enemy_pct_of(n8['cond']) == (0.08, 0.0),
+       '带入段「敌方战力 +8%」→ 显示 +8%、战斗 +0%（面板虚高，战斗用基础值）')
+    ck(cond_pct(n8) == {} and cond_all_pct(n8) == 0.0,
+       '「敌方战力」不进我方单参数通道、也不进全参数通道（此前会误算成我方 +8%）')
+
+    # 据点5 形状：同一条件挂在**全域**段 → 只宣告、不改本据点显示也不参与战斗
+    n5 = {'cond': {'our_pairs': [{'attr': '敌方战力', 'pct': 8, 'scope': '全域'}]}}
+    ck(enemy_pct_of(n5['cond']) == (0.0, 0.0),
+       '全域段「敌方战力 +8%」不改本据点显示值（实测面板与部署界面一致）')
+
+    # 区域段（暂无实拍样例）：按「区域 = 永久生效」推为战斗加成
+    nz = {'cond': {'our_pairs': [{'attr': '敌方战力', 'pct': 10, 'scope': '区域'}]}}
+    ck(enemy_pct_of(nz['cond']) == (0.0, 0.10), '区域段 → 只作战斗加成（不反推显示）')
+    ck(cond_enemy_pct(nz) == (0.0, 0.10), 'cond_enemy_pct 取 node[cond]')
+
+    # 单值兜底路径（无 pairs）：靠 scope 分流
+    nb = {'cond': {'attr': '敌方战力', 'pct': 8, 'scope': '带入'}}
+    ck(enemy_pct_of(nb['cond']) == (0.08, 0.0), 'pairs 缺失时走单值兜底')
+    # 我方侧的「战力 −X%」不受影响
+    no = {'cond': {'attr': '战力', 'pct': -24, 'scope': '区域'}}
+    ck(cond_all_pct(no) == -0.24 and enemy_pct_of(no['cond']) == (0.0, 0.0),
+       '我方「战力 −24%」仍是全参数削弱，不被当成敌方加成')
+
+
 def main():
     for t in (t_map, t_crossdomain, t_power, t_buff, t_cond, t_default_target,
               t_snapshots, t_pool, t_varconfig,
@@ -1557,7 +1589,7 @@ def main():
               t_banned_input, t_var_input, t_disabled_var,
               t_final_stage_reserve, t_std_variation, t_cond_display,
               t_scenario_search, t_disabled_all, t_efficiency_drop,
-              t_perm_attack, t_trim):
+              t_perm_attack, t_trim, t_enemy_power):
         t()
     print()
     if FAIL:
