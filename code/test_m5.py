@@ -562,6 +562,58 @@ def t_all_stages():
         ck(True, '缺阶段号 → ValueError（CLI 会提示改用单阶段模式）')
 
 
+def t_boss_reserve():
+    print('\n== 9c. 关底预留：先算关底要哪几张卡 → 前面各阶段禁用这些卡 ==')
+    # 场景（合成的「卡池略紧」）：阶段1 一个普通据点 + 一个困难据点，
+    # 阶段2 是关底。金卡 hp3 = 200-220（对 190 是 100%）、hp2 = 179-199
+    # （对 190 只有 48%）—— 也就是**关底那 4 张金卡一旦在前面被打掉一格，
+    # 关底就废**。
+    fleet = ([mkcard(i, [45, 45, 45]) for i in range(1, 9)]
+             + [mkcard(i, [70, 70, 70]) for i in range(90, 94)])
+    for c in fleet:                       # 金卡标 3 级（等级治理的对象）
+        c['tier'] = 'gold' if c['id'] >= 90 else 'blue'
+    nodes = [mknode('s1n1', [120] * 4), mknode('s1n2', [200] * 4),
+             mknode('boss', [190] * 4, progress=True, tokens=600)]
+    for n, st, no, lab in ((nodes[0], 1, 1, '普通'), (nodes[1], 1, 2, '困难'),
+                           (nodes[2], 2, 3, '困难')):
+        n['stage'], n['node'], n['difficulty_label'] = st, no, lab
+    inp = {'current': 1, 'total': 2, 'missing': [], 'uses_max': 0}
+    kw = dict(target=1.0, uses_max=0, no_local=True, boss_rollback=False)
+
+    # ① 不预留（旧行为）：阶段1 的困难据点把 4 张金卡用掉 → 关底拿到带伤卡
+    res0, _ = plan_all_stages(fleet, inp, {}, nodes, boss_reserve=False, **kw)
+    plans0 = {p['nodes']['name']: p for st in res0 for p in res0[st]['plan']}
+    ck(all(p['meets_target'] for p in plans0.values() if p['nodes']['name'] != 'boss'),
+       '不预留：阶段1 两个据点都达标')
+    ck(not plans0['boss']['meets_target'],
+       '不预留：关底拿到**带伤**金卡 → 未达标（%.0f%%）'
+       % (min_rate(plans0['boss']['win_rates']) * 100))
+
+    # ② 关底预留（默认）：金卡在阶段1 一律禁用 → 关底满血 → 达标
+    res1, _ = plan_all_stages(fleet, inp, {}, nodes, boss_reserve=True, **kw)
+    plans1 = {p['nodes']['name']: p for st in res1 for p in res1[st]['plan']}
+    boss_ids = {c['id'] for c in plans1['boss']['cards']}
+    ck(boss_ids >= {90, 91, 92, 93}, '预留：关底仍拿到那 4 张金卡 %s' % sorted(boss_ids))
+    ck(plans1['boss']['meets_target'], '预留：关底达标（100%）')
+    held = {c['id'] for p in res1[1]['plan'] for c in p['cards']}
+    ck(not (held & boss_ids), '预留：阶段1 一张预留卡都没碰（%s）' % sorted(held))
+    ck(all(start == HP_MAX for k, start in res1[2]['damaged_start'].items()
+           if k in boss_ids), '预留：关底那几张卡进场时是满血')
+    ck(any('关底预留' in x for x in res1[1]['notes']),
+       '预留：阶段1 的说明里写明「本阶段禁用了关底预留的卡」')
+
+    # ③ 关底在全卡满血下都算不到 → 不做预留（免白白削弱前面阶段）
+    hard = [mknode('hboss', [400] * 4, progress=True, tokens=600)]
+    hard[0]['stage'], hard[0]['node'], hard[0]['difficulty_label'] = 2, 1, '困难'
+    tough1 = mknode('s1n2', [200] * 4)
+    tough1['stage'], tough1['node'], tough1['difficulty_label'] = 1, 1, '困难'
+    res2, _ = plan_all_stages(fleet, inp, {}, [tough1, hard[0]],
+                              boss_reserve=True, **kw)
+    ck(res2[1]['plan'][0]['meets_target'],
+       '关底不可能达标时不做预留：阶段1 那个必须用金卡的据点仍能达标（%s）'
+       % sorted(c['id'] for c in res2[1]['plan'][0]['cards']))
+
+
 def t_cond_types():
     print('\n== 9b. 条件五类建模：战力削弱 + 禁用舰种（用户 2026-10-11 口径） ==')
     # 口径前提：敌方侧**属性/舰种**加成已体现在截图战力数字里，程序不重复计算；
@@ -1590,7 +1642,8 @@ def main():
     for t in (t_map, t_crossdomain, t_power, t_buff, t_cond, t_default_target,
               t_snapshots, t_pool, t_varconfig,
               t_stage_plan, t_variations, t_local_search, t_json_out,
-              t_html_panel, t_input_editor, t_all_stages, t_cond_types,
+              t_html_panel, t_input_editor, t_all_stages, t_boss_reserve,
+              t_cond_types,
               t_banned_input, t_var_input, t_disabled_var,
               t_final_stage_reserve, t_std_variation, t_cond_display,
               t_scenario_search, t_disabled_all, t_efficiency_drop,

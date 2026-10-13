@@ -2596,7 +2596,7 @@ def _boss_failed_stage(groups, results):
 
 def plan_all_stages(fleet, inp, damaged0, nodes, target=TARGET_RATE,
                     uses_max=None, no_local=False, save_gold=True,
-                    boss_rollback=True, max_rollback=3):
+                    boss_reserve=True, boss_rollback=False, max_rollback=3):
     """整局模式（--all）：按**面板 OCR 的阶段号**分组，逐阶段顺序求解
 
     据点编号在整个行动内连续（据点1~7 跨阶段 1~4），但**部署约束是按阶段
@@ -2617,6 +2617,20 @@ def plan_all_stages(fleet, inp, damaged0, nodes, target=TARGET_RATE,
     末阶段预留失效）。玩家输入只作兜底：取两者较大值，截图只覆盖前半段时
     不会把中间阶段误判成最终阶段（末阶段预留宁保守不失效）。
     每个阶段的 docs 里 `stage.total` 都是这个 OCR 口径的总数。
+
+    **关底预留 `boss_reserve`（2026-10-13，用户方案）**：把关底阶段的据点
+    先**单独**按「全卡满血」算一遍，取它用到的卡当**预留**，再让**它之前的
+    所有阶段禁用这些卡**重跑正向 —— 保证关底那几张卡不会被前序阶段提前
+    用掉（用掉一次就 −1 格，关底就弱了），从而**保证关底达标**。
+    这是「事前预留」而非「事后回退」：回退要等失败才发现、且要整段重跑
+    若干轮；预留一次就把资源让给关底了。`boss_rollback`（旧的事后回退）
+    默认**关闭**，需要时用 `--boss-rollback` 打开。
+    ⚠ 预留取的是**关底所在阶段整段**用到的卡，不只是关底那一关 ——
+    同一阶段的据点共用卡池，且卡进关底阶段时的血量正是前面阶段留下的，
+    只留关底那一关会用到的卡，同阶段其它据点仍可能把关底要用的卡打伤
+    （阶段级 `plan_variations` 与血量接力都在阶段粒度上）。
+    ⚠ 关底在**全卡满血**下都算不到目标胜率时**不做预留**（预留也救不了
+    关底，只会白白削弱前面阶段），照常按顺序求解并照实报未达标。
     """
     nodes, dedupe_notes = _dedupe_nodes(nodes)
     for x in dedupe_notes:
@@ -2634,6 +2648,49 @@ def plan_all_stages(fleet, inp, damaged0, nodes, target=TARGET_RATE,
     base_damaged = {int(k): int(v) for k, v in (damaged0 or {}).items()}
     slot_names, var_status = load_var_config()
 
+    def stage_args(st):
+        """某阶段求解的公共实参（预留解与正向跑必须完全一致）"""
+        nodes_st = groups[st]
+        _require_powers(nodes_st)
+        inp_st = dict(inp)
+        inp_st['current'] = st
+        inp_st['total'] = total
+        inv, inv_src = stage_inventory(nodes_st, inp_st, slot_names)
+        return nodes_st, inp_st, inv, inv_src
+
+    def solve_stage(st, pool, inv, frugal=False):
+        return stage_solve(
+            pool, groups[st], inv, target=target, uses_max=uses_max,
+            save_gold=save_gold, final_stage=(st == total),
+            use_local_search=not no_local, frugal_all=frugal)
+
+    # --- 关底预留：先把关底阶段单独算一遍，取它要用的卡 ---
+    boss_stages = sorted({int(n['stage']) for n in nodes
+                          if n.get('is_progress')})
+    frozen, reserved = {}, {}
+    if boss_reserve and boss_stages:
+        for st in boss_stages:
+            _nodes_st, _inp_st, inv, _src = stage_args(st)
+            out = solve_stage(st, build_pool(fleet, inp['missing'],
+                                             base_damaged)[0], inv)
+            plan0, skipped0, rem0, inv_left0, uses0, notes0 = out
+            if any(not p.get('meets_target') for p in plan0) or skipped0:
+                print('【关底预留】阶段 %d 在全卡满血下也没算出目标胜率'
+                      '（未达标 %d 个、跳过 %d 个）→ 不做预留，照常按顺序求解'
+                      % (st, sum(1 for p in plan0 if not p.get('meets_target')),
+                         len(skipped0)), flush=True)
+                continue
+            ids = {c['id'] for p in plan0 for c in p['cards']}
+            frozen[st], reserved[st] = out, ids
+            names = sorted({c['name'] for p in plan0 for c in p['cards']})
+            print('【关底预留】阶段 %d 先单独算一遍（全卡满血、可达标）：它要用 '
+                  '%d 张卡 → 阶段 %s 一律禁用这些卡（%s%s）'
+                  % (st, len(ids),
+                     '、'.join(str(x) for x in sorted(
+                         x for x in groups if x < st)) or '无（关底在第一阶段）',
+                     '、'.join(names[:8]),
+                     ' 等' if len(names) > 8 else ''), flush=True)
+
     def forward(frugal_stages=frozenset()):
         """正向跑一遍（`frugal_stages` 内的阶段强制省卡）→ (results, docs)
 
@@ -2642,22 +2699,29 @@ def plan_all_stages(fleet, inp, damaged0, nodes, target=TARGET_RATE,
         damaged = dict(base_damaged)
         results, docs = {}, []
         for st in sorted(groups):
-            nodes_st = groups[st]
-            _require_powers(nodes_st)
-            inp_st = dict(inp)
-            inp_st['current'] = st
-            inp_st['total'] = total
-            pool, dead = build_pool(fleet, inp['missing'], damaged)
-            # 变项库存要**先**取（search_node 用它决定「选阵时是否计入标准变项」）
-            inv, inv_src = stage_inventory(nodes_st, inp_st, slot_names)
-            plan, skipped, remaining, inv_left, uses_left, notes = stage_solve(
-                pool, nodes_st, inv, target=target, uses_max=uses_max,
-                save_gold=save_gold, final_stage=(st == total),
-                use_local_search=not no_local,
-                frugal_all=(st in frugal_stages))
+            nodes_st, inp_st, inv, inv_src = stage_args(st)
+            # 关底预留：**本阶段之后**的关底阶段要用到的卡，本阶段一律不准碰
+            hold = set()
+            for st_b, ids in reserved.items():
+                if st < st_b:
+                    hold |= ids
+            pool, dead = build_pool(
+                fleet, list(inp['missing']) + sorted(hold), damaged)
+            if st in frozen:
+                # 关底阶段直接用预留解（它只用预留卡，那些卡必然满血在场）；
+                # 只有「剩余卡池」按**真实**牌面重算，供显示与 plan/v1 用
+                plan, skipped, _rem, inv_left, uses_left, notes = frozen[st]
+                used_ids = {c['id'] for p in plan for c in p['cards']}
+                remaining = [c for c in pool if c['id'] not in used_ids]
+            else:
+                plan, skipped, remaining, inv_left, uses_left, notes = \
+                    solve_stage(st, pool, inv, frugal=(st in frugal_stages))
             note_inv = inv_source_note(inv_src, nodes_st)
             if note_inv:
                 notes.insert(0, note_inv)
+            if hold:
+                notes.append('本阶段禁用了关底预留的 %d 张卡'
+                             '（保证关底满血可用）' % len(hold))
             results[st] = {'plan': plan, 'skipped': skipped,
                            'remaining': remaining, 'uses_left': uses_left,
                            'notes': notes, 'var_status': var_status,
@@ -2728,13 +2792,20 @@ def main(argv=None):
     ap.add_argument('--no-save-gold', action='store_true',
                     help='关闭等级治理（默认开启：简单/普通据点不动用'
                          ' 3 级舰，把高等级卡留给硬仗）')
+    ap.add_argument('--no-boss-reserve', action='store_true',
+                    help='关闭「关底预留」（**默认开启**：整局模式先把关底'
+                         '阶段单独按全卡满血算一遍，它要用到的卡在**前面各'
+                         '阶段一律禁用**，保证关底那几张卡满血可用、关底达标）')
+    ap.add_argument('--boss-rollback', action='store_true',
+                    help='**旧的事后回退**（默认关闭）：关底没算出 100%% 时'
+                         '把前面的阶段改成强制省卡后整段重跑，最多回退 '
+                         '--rollback-max 次。现由「关底预留」事前解决，'
+                         '此开关只在预留也救不了时才有意义')
     ap.add_argument('--no-boss-rollback', action='store_true',
-                    help='关闭「关底算不出 → 逐阶段倒退」（默认开启：关底'
-                         '（掉进度代币的据点）没算出 100%% 时，把前面的阶段'
-                         '改成强制省卡后整段重跑，最多回退 --rollback-max 次）')
+                    help='（已废弃）事后回退现在是默认关闭的，本开关无效果')
     ap.add_argument('--rollback-max', type=int, default=3, metavar='N',
-                    help='逐阶段倒退的最大次数，默认 3（每回退一次多把一个'
-                         '前序阶段改为强制省卡）')
+                    help='事后回退的最大次数，默认 3（需 --boss-rollback；'
+                         '每回退一次多把一个前序阶段改为强制省卡）')
     ap.add_argument('--all', action='store_true',
                     help='**整局模式**：--stage-dir 下放整个行动的全部截图，'
                          '按面板阶段号自动分组、逐阶段顺序求解'
@@ -2850,7 +2921,8 @@ def main(argv=None):
                 fleet, inp, damaged, nodes, target=args.target,
                 uses_max=inp['uses_max'], no_local=args.no_local,
                 save_gold=not args.no_save_gold,
-                boss_rollback=not args.no_boss_rollback,
+                boss_reserve=not args.no_boss_reserve,
+                boss_rollback=args.boss_rollback,
                 max_rollback=args.rollback_max)
         except ValueError as e:
             print('⚠ %s' % e)
