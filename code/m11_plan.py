@@ -460,6 +460,12 @@ def parse_node(name, path, ocr=True, need_weak=True, banned=None,
         cond['needs_review'] = [x for x in (cond.get('needs_review') or [])
                                 if not str(x).startswith('禁用舰种来自图标匹配')]
     cond['ban_types'] = ban_final
+    if ban_from_input:
+        # 玩家输入是**整份名单**（不是增补）：显示也要跟着走 —— 否则
+        # `ban_text` 仍照 ban_rows 念面板认出的那几行，与生效列表自相矛盾
+        cond['ban_rows'] = ([{'scope': cond.get('ban_scope'),
+                              'types': list(ban_final)}]
+                            if ban_final else [])
 
     # 「禁用变项」（区域条件，用户 2026-10-12 裁决）→ `resolve_disabled`
     # （单一实现，可单测；详见该函数的口径说明）。
@@ -776,19 +782,57 @@ def cond_enemy_pct(node):
 def cond_ban_types(node):
     """「禁用舰种」类条件 → 不可 deploy 的舰种列表（如 ['巡洋舰']）
 
-    仅「区域」条件生效。禁用条目的**图标没有文字**，归属由 m9 的
-    `ban_scope` 给出（它**上方最近的分区标题**）；缺失时退回节点级闸门。
+    仅「区域」条件生效。禁用条目的**图标没有文字**，一个据点可有**多行**
+    （带入/区域/指定各一行），归属由 m9 的 `ban_rows` 逐行给出（每行 = 它
+    **上方最近的分区标题**）。
 
     ⚠ 4.28：原先只看节点级 `_cond_active` —— 一个据点里同时有「带入」与
     「区域」两段时，节点级 scope 会算成区域，把**带入段的禁用**错误生效
     （实测 mygame_s4 关底 `00-18-13` 的禁用挂在带入段却被生效）。
+    ⚠ 2026-10-13：原先只读**第一行**（m9 取首个「单位类型」锚点）—— 那份
+    实拍的第一行恰好是带入段，于是**区域段的禁用根本没被看过**（玩家反馈
+    「区域禁了战列舰和驱逐舰，程序照样上驱逐舰」）。现在逐行判归属。
     """
     c = node.get('cond') or {}
+    rows = c.get('ban_rows')
+    if rows:
+        out = set()
+        for r in rows:
+            sc = r.get('scope')
+            ok = _scope_region(sc) if sc is not None else _cond_active(node)
+            if ok:
+                out.update(r.get('types') or [])
+        return sorted(out)
+    # 旧数据（plan.json 里没有 ban_rows）：退回单值 + 节点级闸门
     if not c.get('ban_types'):
         return []
     sc = c.get('ban_scope')
     ok = _scope_region(sc) if sc is not None else _cond_active(node)
     return list(c['ban_types']) if ok else []
+
+
+def ban_text(c):
+    """「禁用舰种」的显示文本：多行条目**逐行列出**并标注是否计入
+
+    只显示生效的那部分，玩家会以为另一行读漏了；只显示全部又不说明哪行拦人
+    —— 两者都不行，所以逐行写清「（X 段）+ 是否计入」。
+    """
+    rows = c.get('ban_rows')
+    if not rows:
+        bs = c.get('ban_scope')
+        return ('禁用' + '、'.join(c.get('ban_types') or [])
+                + ('（%s 段）' % bs if bs else ''))
+    segs = []
+    for r in rows:
+        tps = r.get('types') or []
+        lbl = '（%s 段）' % r['scope'] if r.get('scope') else ''
+        if not tps:
+            segs.append('禁用舰种未识别出' + lbl)
+        else:
+            segs.append('禁用' + '、'.join(tps) + lbl
+                        + ('' if r.get('scope') in (None, '区域')
+                           else '，未计入（全胜口径）'))
+    return '｜'.join(segs)
 
 
 def cond_buff_suppress(node):
@@ -2008,10 +2052,8 @@ def format_plan(plan, pool, remaining, nodes, inp, uses_max, uses_left,
                 parts.append('禁用变项（禁用：%s）' % '、'.join(dis))
             else:
                 parts.append('禁用变项（未填具体变项，按不禁用处理）')
-        if c.get('ban_types'):
-            bs = c.get('ban_scope')
-            parts.append('禁用' + '、'.join(c['ban_types'])
-                         + ('（%s 段）' % bs if bs else ''))
+        if c.get('ban_types') or c.get('ban_rows'):
+            parts.append(ban_text(c))
         if parts:
             cond = '战斗条件：' + ' · '.join(parts)
             # 标注必须来自**实际折算结果**（cond_pct / cond_all_pct /
@@ -2277,6 +2319,14 @@ def plan_to_json(inp, plan, remaining, uses_max, uses_left, notes,
                           'directive': c.get('directive'),
                           'ban_item': bool(c.get('ban_item')),
                           'ban_types': list(c.get('ban_types') or []),
+                          # 新增可选字段：禁用条目的**逐行**读数 —— 一个据点
+                          # 可以有多行「禁用的单位类型」（带入/区域/指定各一
+                          # 行），每行 {'scope', 'types'}。拦人的只有区域行
+                          # （`ban_types` 已经是那一部分）；界面要展示面板
+                          # 原貌（含不生效的行）请用这个。
+                          'ban_rows': [{'scope': r.get('scope'),
+                                        'types': list(r.get('types') or [])}
+                                       for r in (c.get('ban_rows') or [])],
                           'disabled_variations': list(n.get('disabled')
                                                       or []),
                           # 新增可选字段：True = 该据点**全部变项不可用**

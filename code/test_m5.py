@@ -350,8 +350,13 @@ def t_json_out():
                            'directive': None, 'ban_item': False,
                            'ban_types': [], 'disabled_variations': [],
                            'disabled_all': False,
+                           # 2026-10-13 新增：禁用条目的**逐行**读数（一个据点
+                           # 可有多行 带入/区域/指定，拦人的只有区域行；
+                           # `ban_types` 已是那部分）。该据点无禁用条目 → []
+                           'ban_rows': [],
                            'quantified': True, 'pairs': []},
-       '条件字段（quantified=True；含新增可选字段 pairs / disabled_all）')
+       '条件字段（quantified=True；含新增可选字段 pairs / disabled_all / '
+       'ban_rows）')
     ck(nd['progress_tokens'] == 1000 and nd['is_progress'], '进度代币字段')
 
     a = nd['assignment'][0]

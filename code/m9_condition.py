@@ -64,6 +64,7 @@ _GLYPH_TPL = None
 SOLID_ARM_MIN = 0.40    # 实心度 ≥ 此值 → 实心族（旗形/箭头）
 THIN_ARM_MAX = 0.25     # 实心度 ≤ 此值 → 细臂族（飞机机影）
 GLYPH_MIN_SCORE = 0.40  # 图标匹配的最低 IoU（低于它算「认不出」→ 提示人工确认）
+STRIPE_ROWS_MIN = 2     # 出现「2 道斜纹」的行数下限（见 _stripe_class）
 
 
 def _solidity(mask):
@@ -97,9 +98,45 @@ def _arm_class(s):
     return None
 
 
+def _stripe_class(mask):
+    """旗形上的**内部斜纹条数** → 0 / 1 / 2（2 = 两道及以上）
+
+    斜纹是旗形内部的浅色斜线，水平切过去就是「夹在两块前景之间的一段空白」，
+    所以逐行数这种**内部空白段**、取各行最大值即可。实测（2026-10-13 玩家实拍
+    + 全部入库样本，20 个 blob 逐个人工判读）：
+      实心旗（驱逐舰）/ 飞机机影 → 0 道
+      巡洋舰（1 道斜纹）        → 1 道
+      战列舰（2 道斜纹）        → 2 道，且**有 3~4 行**都是 2 道
+    ⚠ 为什么不能只靠 IoU：实测战列舰的实拍 blob（阶段3 据点7）巡洋舰 0.81 ＞
+    战列舰 0.78 —— IoU 被旗形**轮廓**主导，1 道与 2 道斜纹只差 0.03，读错。
+    故此处按条数当硬闸门；要求至少 `STRIPE_ROWS_MIN` 行出现 2 道，避免单个
+    噪声孔把实心旗误判成双斜纹。
+    """
+    best, n_two = 0, 0
+    for row in mask:
+        runs, cur, n = [], row[0], 1
+        for v in row[1:]:
+            if v == cur:
+                n += 1
+            else:
+                runs.append((cur, n)); cur, n = v, 1
+        runs.append((cur, n))
+        while runs and not runs[0][0]:      # 去掉首尾的边界空白（不属于旗形内部）
+            runs.pop(0)
+        while runs and not runs[-1][0]:
+            runs.pop()
+        gaps = sum(1 for v, _n in runs if not v)
+        best = max(best, gaps)
+        if gaps >= 2:
+            n_two += 1
+    if best >= 2 and n_two >= STRIPE_ROWS_MIN:
+        return 2
+    return best
+
+
 def _glyph_templates():
     """禁用舰种图标模板（data/type_glyphs/ban_*.png）
-    → {类型: [(24x24 的 0/1 掩码, 原始尺度实心度), ...]}
+    → {类型: [(24x24 的 0/1 掩码, 原始尺度实心度, 斜纹条数), ...]}
 
     每个类型可有**多个渲染变体**（文件名 ban_类型.png 与 ban_类型_2.png...），
     匹配取各变体的最高分。图标来源（2026-10-11 用户实拍确认）：
@@ -138,7 +175,8 @@ def _glyph_templates():
         core = (a < 150).astype(np.uint8)
         im = Image.fromarray(core * 255).resize((24, 24), Image.LANCZOS)
         out.setdefault(t, []).append(
-            ((np.array(im) > 100).astype(np.uint8), _solidity(core)))
+            ((np.array(im) > 100).astype(np.uint8), _solidity(core),
+             _stripe_class(core)))
     _GLYPH_TPL = out
     return out
 
@@ -157,16 +195,22 @@ def _glyph_score(crop, tpl):
 def _match_glyph(crop, tpls):
     """一个图标 blob → 最像的舰种，返回 (相似度, 类型)；都不够像 → None
 
-    先按**形体族**过滤模板再比 IoU：「实心旗」与「细臂十字」根本不同族，
-    而拉伸归一化能把飞机的十字压成实心块、让实心模板赢（实测面板上的飞机
-    机影 20x12：实心「驱逐舰」模板 0.56 ＞ 「飞机」0.53）。族不明确
-    （落在过渡带）时不设限，退回按全部模板比。
+    两层闸门先过滤模板、再比 IoU，都是「形状结构」上的硬判据，因为 IoU 在
+    这两处都被外形轮廓主导、余量只有 0.03：
+      · **形体族**：实心旗 vs 细臂十字（飞机机影）。拉伸归一化会把飞机的
+        十字压成实心块、让实心模板赢（实测飞机的 20x12 机影：实心「驱逐舰」
+        模板 0.56 ＞「飞机」0.53）；
+      · **斜纹条数**（只对实心族生效）：0 / 1 / 2 道 —— 实测战列舰的实拍 blob
+        巡洋舰 0.81 ＞ 战列舰 0.78（阶段3 据点7，玩家实拍）。
+    族或条数落在过渡带时不设限，退回按全部模板比。
     """
     bcls = _arm_class(_solidity(crop))
+    bstripe = _stripe_class(crop) if bcls == 'solid' else None
     best = None
     for t, variants in tpls.items():
-        scores = [_glyph_score(crop, v) for v, s in variants
-                  if bcls is None or _arm_class(s) in (None, bcls)]
+        scores = [_glyph_score(crop, v) for v, s, st in variants
+                  if (bcls is None or _arm_class(s) in (None, bcls))
+                  and (bstripe is None or st == bstripe)]
         if not scores:
             continue
         s = max(scores)
@@ -192,19 +236,17 @@ def _scope_above(cond, y):
     return best[0] if best else None
 
 
-def _read_ban_glyphs(panel, cond):
-    """「禁用的单位类型」→ 图标匹配出被禁舰种 + 该条目所属分区
+def _read_ban_row(panel, cond, anchor):
+    """**一行**「禁用的单位类型」→ (舰种列表, 提示, 该条目所属分区)
 
-    图标**没有文字**，只能按图标识别：定位条件区里含「单位类型」的
-    锚文本行，其下方的暗色小图形即被禁舰种图标（1~2 枚）。
-    返回 (ban_types, review_notes, ban_scope)。识别不出/相似度不足 → review。
-    ban_scope = 该条目上方最近的分区标题（带入/区域/指定/全场/全域）。
+    图标**没有文字**，只能按图标识别：定位含「单位类型」的锚文本行，其**下方
+    最后一段暗色图形**就是被禁舰种图标（1~2 枚）。行分组取**最后一组** ——
+    锚文本与图标行之间有空隙，整带提取会把文本笔画混进来。
+    scope = 该条目**上方最近的分区标题**（带入/区域/指定/全场/全域），见
+    `_scope_above`；一个据点可以有多行（见 `_read_ban_rows`）。
     """
     tpls = _glyph_templates()
     if not tpls:
-        return [], [], None
-    anchor = next((i for i in cond if '单位类型' in i['text']), None)
-    if anchor is None:
         return [], [], None
     bscope = _scope_above(cond, anchor['y'])
     H, W = panel.shape[:2]
@@ -212,8 +254,6 @@ def _read_ban_glyphs(panel, cond):
     band = panel[int(anchor['y']) + 4: int(anchor['y']) + int(H * 0.05),
                  x0: min(W, x0 + int(W * 0.30))]
     dark = (to_gray(band) < 150).astype(np.uint8)
-    # 行分组取**最后一组**：锚文本（「禁用的单位类型」）与图标行之间有
-    # 空隙，直接整带提取会把文本笔画混进来
     rowhas = dark.sum(axis=1) > 0
     groups, cur = [], None
     for i, v in enumerate(rowhas):
@@ -228,17 +268,20 @@ def _read_ban_glyphs(panel, cond):
         return [], [], bscope
     gy0, gy1 = groups[-1]
     from m2_layout import connected_boxes
-    boxes = connected_boxes(dark[gy0:gy1], min_px=12)
     # 每个 blob 对每个类型取**变体最高分**；再按分数降序做**互斥分配**
     # （被禁类型互不相同，高分 blob 先选）—— 避免两个 blob 抢同一类型、
     # 另一类型落空（实测「禁用战列舰+飞机」飞机被抢成战列舰）
     pairs = []
-    for b in boxes:
+    n_blob = n_wide = 0
+    for b in connected_boxes(dark[gy0:gy1], min_px=12):
         w, h = b[2] - b[0], b[3] - b[1]
         if not (6 <= w <= 45 and 5 <= h <= 35):
+            # 过宽 = 两枚图标**粘在一起**了（面板上它们本就紧邻），不该静默丢掉
+            n_wide += 1 if w > 45 else 0
             continue
+        n_blob += 1
         crop = dark[gy0 + b[1]:gy0 + b[3], b[0]:b[2]]
-        hit = _match_glyph(crop, tpls)      # 含「形体分族」闸门，见该函数
+        hit = _match_glyph(crop, tpls)      # 含「形体」「斜纹」两层闸门
         if hit:
             pairs.append((hit[0], b[0], hit[1], crop))
     out, review = [], []
@@ -253,7 +296,73 @@ def _read_ban_glyphs(panel, cond):
         review.append('禁用舰种来自图标匹配（%s）%s，建议抽检一次'
                       % ('、'.join(sorted(set(out))),
                          '（%s 段）' % bscope if bscope else ''))
+    elif n_blob or n_wide:
+        # 认不出**必须出声**：静默跳过 = 玩家以为禁用了、程序照样上（实测就是
+        # 这么被发现的）。过宽的那条尤其要提 —— 两枚图标粘在一起了。
+        review.append('「禁用的单位类型」有图标但没认出舰种%s（%s 段）'
+                      '—— 请照面板用 banned_types 补录'
+                      % ('（有 %d 处图形过宽，疑似两枚图标粘连）' % n_wide
+                         if n_wide else '',
+                         bscope or '未读出作用域'))
     return sorted(set(out)), review, bscope
+
+
+def _read_ban_glyphs(panel, cond):
+    """兼容入口：只读**第一行** → (ban_types, review, ban_scope)
+
+    生产路径已改走 `_read_ban_rows`（多行）；这个单行版本留给
+    `parse()` 之外的调用与逐行诊断使用。
+    """
+    anchor = next((i for i in cond if '单位类型' in i['text']), None)
+    if anchor is None:
+        return [], [], None
+    return _read_ban_row(panel, cond, anchor)
+
+
+def _read_ban_rows(panel, cond):
+    """面板上**每一行**「禁用的单位类型」→ ([{'scope','types'}], review)
+
+    ⚠ 2026-10-13 修（玩家实拍：阶段3 据点7）：一个据点可以有**多行**禁用条目
+    —— 带入 / 区域 / 指定 各挂一行，三行各自禁不同的舰种。原先只读**第一行**
+    （那份实拍的第一行是「带入」段），于是**区域段的禁用根本没被看过**：
+    玩家看到的就是「区域明明禁了战列舰和驱逐舰，程序照样上驱逐舰」。
+
+    行归属仍是「上方最近的分区标题」，每行独立判断；**是否生效**由
+    `ban_effective` 按「只认区域」口径决定。
+    """
+    rows, review = [], []
+    for anchor in (i for i in cond if '单位类型' in i['text']):
+        types, notes, sc = _read_ban_row(panel, cond, anchor)
+        rows.append({'scope': sc, 'types': types})
+        review.extend(notes)
+    return rows, review
+
+
+def ban_effective(rows):
+    """多行禁用条目 → **实际生效**的舰种（只认「区域」段 / 未读出作用域）
+
+    用户口径（同 m11._scope_region）：全胜后条件被移除，带入 / 指定 / 全场 /
+    全域的禁用不会积累到头上 —— 只有「区域」（永久、仅本据点）拦人。
+    """
+    out = set()
+    for r in rows or []:
+        if r.get('scope') in (None, '区域'):
+            out.update(r.get('types') or [])
+    return sorted(out)
+
+
+def ban_scope_label(rows):
+    """多行禁用条目 → 兼容旧字段 `ban_scope` 的**单个**分区标签
+
+    `ban_types` 只装生效的舰种，这个标签用来解释它们出自哪一段：有区域行就
+    是「区域」；否则退回第一行的分区 —— 此时 `ban_types` 为空，标签只用于
+    显示「第一行挂在带入段，所以不生效」。
+    """
+    rows = list(rows or [])
+    if any(r.get('scope') in (None, '区域') for r in rows):
+        return '区域'
+    return rows[0].get('scope') if rows else None
+
 
 _OCR = None
 
@@ -620,11 +729,13 @@ def parse(path, ocr=True):
     out['scope'] = next((s for s in SCOPES if s in ctext), None)
 
     # 禁用舰种：「禁用的单位类型」以**图标**列出（无文字），按图标模板匹配
-    # （与「禁用变项」ban_item 是两回事）。**同时返回它所属的分区** ——
-    # 只有「区域」段的禁用才生效（4.28）。
-    bans, ban_review, ban_scope = _read_ban_glyphs(panel, cond)
-    out['ban_types'] = bans
-    out['ban_scope'] = ban_scope
+    # （与「禁用变项」ban_item 是两回事）。一个据点可有**多行**（带入/区域/
+    # 指定各一行），逐行读、逐行归属分区；只有「区域」行拦人（4.28），
+    # 但每行都记下来（`ban_rows`）供显示与人工核对。
+    ban_rows, ban_review = _read_ban_rows(panel, cond)
+    out['ban_rows'] = ban_rows
+    out['ban_types'] = ban_effective(ban_rows)
+    out['ban_scope'] = ban_scope_label(ban_rows)
 
     # 指令类条件（如「摧毁3个敌方单位以移除战斗条件」）
     if '摧毁' in ctext or '移除战斗条件' in cflat:

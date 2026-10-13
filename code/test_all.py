@@ -47,6 +47,11 @@ KEY_SAMPLES = {
     # 光板旗（无斜纹）= 驱逐舰（2026-10-13 用户实拍确认）。加模板前它被
     # 巡洋舰模板抢走（实测 0.70 胜出）—— 见下面的 ban_glyph_unit()
     'ban_destroyer': {'bans': ['驱逐舰'], 'applied_bans': ['驱逐舰']},
+    # **三行**禁用条目（带入=飞机 / 区域=战列舰+驱逐舰 / 指定=巡洋舰）。
+    # 2026-10-13 之前只读第一行（带入），区域段压根没被看过 → 玩家看到
+    # 「区域禁了战列舰和驱逐舰，程序照样上驱逐舰」。行归属见 m9._read_ban_rows
+    'ban_rows_p3kp7': {'bans': ['战列舰', '驱逐舰'],
+                       'applied_bans': ['战列舰', '驱逐舰']},
     'debuff50_p2n7': {'debuff': -50},
 }
 
@@ -54,13 +59,16 @@ KEY_SAMPLES = {
 def ban_glyph_unit():
     """禁用图标识别自检（只用入库的模板 / 旗标，不依赖本地截图）
 
-    锁三件事：① 四类舰种模板齐备；② 按**形体分族**（实心旗 vs 飞机细臂）；
-    ③ 匹配选对类型 —— 特别是「实心旗」模板不许把飞机的机影抢走。
+    锁四件事：① 四类舰种模板齐备；② 按**形体分族**（实心旗 vs 飞机细臂）
+    与**斜纹条数**（0/1/2 道）选对类型；③「实心旗」模板不许把飞机的机影
+    抢走、双斜纹也不许被读成单斜纹；④ 多行禁用条目只认「区域」行。
     """
     import numpy as np
     from PIL import Image
     from m9_condition import (_glyph_templates, _match_glyph, _solidity,
-                              SOLID_ARM_MIN, THIN_ARM_MAX)
+                              _stripe_class, SOLID_ARM_MIN, THIN_ARM_MAX,
+                              ban_effective, ban_scope_label)
+    from m11_plan import cond_ban_types
     bad = []
     tpls = _glyph_templates()
     for t in ('战列舰', '巡洋舰', '驱逐舰', '飞机'):
@@ -82,6 +90,13 @@ def ban_glyph_unit():
             bad.append('%s 实心度 %.2f > %.2f（会被误判成实心族）'
                        % (p.name, s, THIN_ARM_MAX))
 
+    # ②b 斜纹条数：驱逐舰 0 道 / 巡洋舰 1 道 / 战列舰 2 道（实心族）
+    for t, want in (('驱逐舰', 0), ('巡洋舰', 1), ('战列舰', 2)):
+        got = max(_stripe_class((np.array(Image.open(p).convert('L')) < 150))
+                  for p in Path('data/type_glyphs').glob('ban_%s.png' % t))
+        if got != want:
+            bad.append('%s 模板斜纹应 %d 道，实得 %d' % (t, want, got))
+
     # ③ 匹配：把模板源图本身当 blob（灰度→暗像素=形）
     cases = []
     for p in Path('data/type_glyphs').glob('ban_*.png'):
@@ -99,6 +114,28 @@ def ban_glyph_unit():
         if got != want:
             bad.append('%s 图标应识别为 %s，实得 %s'
                        % (getattr(src, 'name', '驱逐舰旗'), want, got))
+
+    # ④ 多行禁用条目：只有「区域」行拦人（带入/指定只记账不生效）
+    rows = [{'scope': '带入', 'types': ['飞机']},
+            {'scope': '区域', 'types': ['战列舰', '驱逐舰']},
+            {'scope': '指定', 'types': ['巡洋舰']}]
+    if ban_effective(rows) != ['战列舰', '驱逐舰']:
+        bad.append('多行禁用：生效集合应=战列舰+驱逐舰，实得 %s'
+                   % ban_effective(rows))
+    if ban_scope_label(rows) != '区域':
+        bad.append('多行禁用：兼容标签应=区域，实得 %s' % ban_scope_label(rows))
+    if cond_ban_types({'cond': {'ban_rows': rows}}) != ['战列舰', '驱逐舰']:
+        bad.append('多行禁用：cond_ban_types 应只收区域行')
+    # 只有带入行 → 不生效；旧数据（无 ban_rows）退回单值 + 节点级闸门
+    if cond_ban_types({'cond': {'ban_rows': [{'scope': '带入',
+                                              'types': ['巡洋舰']}]}}):
+        bad.append('多行禁用：只有带入行时不该拦人')
+    if cond_ban_types({'cond': {'ban_types': ['巡洋舰'],
+                                'ban_scope': '带入'}}):
+        bad.append('旧数据：带入段的禁用不该生效')
+    if cond_ban_types({'cond': {'ban_types': ['巡洋舰'],
+                                'ban_scope': '区域'}}) != ['巡洋舰']:
+        bad.append('旧数据：区域段的禁用应生效')
     return bad
 
 
