@@ -61,15 +61,53 @@ _GLYPH_DIR = None
 _GLYPH_TPL = None
 
 
+SOLID_ARM_MIN = 0.40    # 实心度 ≥ 此值 → 实心族（旗形/箭头）
+THIN_ARM_MAX = 0.25     # 实心度 ≤ 此值 → 细臂族（飞机机影）
+GLYPH_MIN_SCORE = 0.40  # 图标匹配的最低 IoU（低于它算「认不出」→ 提示人工确认）
+
+
+def _solidity(mask):
+    """形体「实心度」：3x3 结构元连续腐蚀两次后，剩余像素占形体的比例
+
+    实心块（旗形/箭头）腐蚀两轮仍留大片核心（实测 0.43~0.61），细臂十字
+    （飞机机影）的机翼/尾翼两轮就没了（实测 0.16~0.20）。
+    ⚠ 必须在**原始像素尺度**上量：归一化到 24x24 时纵横比被拉伸，飞机的
+    十字会被压成实心块，判据随即失效（实测归一化后 0.40，与旗形重叠）。
+    """
+    m = mask.astype(bool)
+    n = int(m.sum())
+    if not n:
+        return 0.0
+    for _ in range(2):
+        e = m.copy()
+        e[1:] &= m[:-1]
+        e[:-1] &= m[1:]
+        e[:, 1:] &= m[:, :-1]
+        e[:, :-1] &= m[:, 1:]
+        m = e
+    return int(m.sum()) / n
+
+
+def _arm_class(s):
+    """按实心度分「形体族」→ 'solid' / 'thin' / None（落在过渡带，不判）"""
+    if s >= SOLID_ARM_MIN:
+        return 'solid'
+    if s <= THIN_ARM_MAX:
+        return 'thin'
+    return None
+
+
 def _glyph_templates():
-    """禁用舰种图标模板（data/type_glyphs/ban_*.png）→ {类型: [24x24 0/1]}
+    """禁用舰种图标模板（data/type_glyphs/ban_*.png）
+    → {类型: [(24x24 的 0/1 掩码, 原始尺度实心度), ...]}
 
     每个类型可有**多个渲染变体**（文件名 ban_类型.png 与 ban_类型_2.png...），
     匹配取各变体的最高分。图标来源（2026-10-11 用户实拍确认）：
       ban_战列舰 —— 面板「禁用的单位类型」实拍裁剪；
       ban_飞机（+ _3 变体）—— 用户单独提供的禁用图标剪影 + 面板实拍。
     舰种旗（潜艇/驱逐舰/巡洋舰/战列舰/航空母舰 *.png）是**舰名旁的类型旗**
-    另一套体系，其中战列舰旗与禁用图标同形，此处不用作匹配源。
+    另一套体系，其中战列舰旗与禁用图标同形 —— 因此**只在拿不到面板实拍时**
+    才拿它反相推导模板（见下 ban_驱逐舰）。
 
     ⚠ 2026-10-12 补：原先只有**战列舰 / 飞机**两个模板 —— 面板上的「巡洋舰」
     禁用图标找不到对应模板，被硬配成**战列舰**（实测 mygame_s4 有 8 个据点全中）。
@@ -81,6 +119,13 @@ def _glyph_templates():
     已 `git mv` 为 `ban_巡洋舰_2.png`。改名前后逐样本比对过：它在所有已入库
     样本里都不是最高分（<0.41，被同类型的其它变体盖住），所以当时没造成误判，
     但标签错了迟早会在别的面板渲染上把巡洋舰读成飞机。
+
+    ⚠ 2026-10-13 补 `ban_驱逐舰`：「光板旗」（无斜纹）此前没有模板，被巡洋舰
+    模板抢走（实测该 blob：巡洋舰 0.70 胜出，而实心度 0.59 说明它是实心旗）。
+    新模板由**旗标反相推导**（`驱逐舰.png` 是深底浅形，反相后才是面板的浅底
+    深形；紧裁后纵横比 20:9 与实拍 22:10 一致）。没用玩家实拍裁剪，因为那张
+    截图只有 1280 宽、图标仅 15×7 像素，斜纹都已糊掉；反相推导那份更干净 ——
+    对实拍 blob 得分 0.83（巡洋舰 0.70）。光板旗＝驱逐舰由用户确认。
     """
     global _GLYPH_DIR, _GLYPH_TPL
     if _GLYPH_TPL is not None:
@@ -90,9 +135,10 @@ def _glyph_templates():
     for f in sorted(_GLYPH_DIR.glob('ban_*.png')):
         t = f.stem[4:].split('_')[0]
         a = np.array(Image.open(f).convert('L'))
-        im = Image.fromarray((a < 150).astype(np.uint8) * 255).resize(
-            (24, 24), Image.LANCZOS)
-        out.setdefault(t, []).append((np.array(im) > 100).astype(np.uint8))
+        core = (a < 150).astype(np.uint8)
+        im = Image.fromarray(core * 255).resize((24, 24), Image.LANCZOS)
+        out.setdefault(t, []).append(
+            ((np.array(im) > 100).astype(np.uint8), _solidity(core)))
     _GLYPH_TPL = out
     return out
 
@@ -106,6 +152,27 @@ def _glyph_score(crop, tpl):
     inter = int((b & tpl).sum())
     union = int((b | tpl).sum())
     return inter / union if union else 0.0
+
+
+def _match_glyph(crop, tpls):
+    """一个图标 blob → 最像的舰种，返回 (相似度, 类型)；都不够像 → None
+
+    先按**形体族**过滤模板再比 IoU：「实心旗」与「细臂十字」根本不同族，
+    而拉伸归一化能把飞机的十字压成实心块、让实心模板赢（实测面板上的飞机
+    机影 20x12：实心「驱逐舰」模板 0.56 ＞ 「飞机」0.53）。族不明确
+    （落在过渡带）时不设限，退回按全部模板比。
+    """
+    bcls = _arm_class(_solidity(crop))
+    best = None
+    for t, variants in tpls.items():
+        scores = [_glyph_score(crop, v) for v, s in variants
+                  if bcls is None or _arm_class(s) in (None, bcls)]
+        if not scores:
+            continue
+        s = max(scores)
+        if s >= GLYPH_MIN_SCORE and (best is None or s > best[0]):
+            best = (s, t)
+    return best
 
 
 def _scope_above(cond, y):
@@ -171,10 +238,9 @@ def _read_ban_glyphs(panel, cond):
         if not (6 <= w <= 45 and 5 <= h <= 35):
             continue
         crop = dark[gy0 + b[1]:gy0 + b[3], b[0]:b[2]]
-        for t, variants in tpls.items():
-            best_v = max(_glyph_score(crop, v) for v in variants)
-            if best_v >= 0.40:
-                pairs.append((best_v, b[0], t, crop))
+        hit = _match_glyph(crop, tpls)      # 含「形体分族」闸门，见该函数
+        if hit:
+            pairs.append((hit[0], b[0], hit[1], crop))
     out, review = [], []
     used_t, used_b = set(), set()
     for s, bx, t, crop in sorted(pairs, reverse=True):

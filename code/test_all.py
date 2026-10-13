@@ -44,8 +44,62 @@ KEY_SAMPLES = {
     # 禁用条目在**区域**段 → 生效
     'ban_cruiser_plane': {'bans': ['巡洋舰', '飞机'],
                           'applied_bans': ['巡洋舰', '飞机']},
+    # 光板旗（无斜纹）= 驱逐舰（2026-10-13 用户实拍确认）。加模板前它被
+    # 巡洋舰模板抢走（实测 0.70 胜出）—— 见下面的 ban_glyph_unit()
+    'ban_destroyer': {'bans': ['驱逐舰'], 'applied_bans': ['驱逐舰']},
     'debuff50_p2n7': {'debuff': -50},
 }
+
+
+def ban_glyph_unit():
+    """禁用图标识别自检（只用入库的模板 / 旗标，不依赖本地截图）
+
+    锁三件事：① 四类舰种模板齐备；② 按**形体分族**（实心旗 vs 飞机细臂）；
+    ③ 匹配选对类型 —— 特别是「实心旗」模板不许把飞机的机影抢走。
+    """
+    import numpy as np
+    from PIL import Image
+    from m9_condition import (_glyph_templates, _match_glyph, _solidity,
+                              SOLID_ARM_MIN, THIN_ARM_MAX)
+    bad = []
+    tpls = _glyph_templates()
+    for t in ('战列舰', '巡洋舰', '驱逐舰', '飞机'):
+        if t not in tpls:
+            bad.append('缺少 %s 的禁用图标模板' % t)
+    if bad:
+        return bad
+
+    # ② 分族：旗形（含斜纹）实心，飞机机影细臂
+    for t in ('战列舰', '巡洋舰', '驱逐舰'):
+        s = max(_solidity((np.array(Image.open(p).convert('L')) < 150))
+                for p in Path('data/type_glyphs').glob('ban_%s*.png' % t))
+        if s < SOLID_ARM_MIN:
+            bad.append('%s 模板实心度 %.2f < %.2f（会被误判成细臂族）'
+                       % (t, s, SOLID_ARM_MIN))
+    for p in Path('data/type_glyphs').glob('ban_飞机*.png'):
+        s = _solidity(np.array(Image.open(p).convert('L')) < 150)
+        if s > THIN_ARM_MAX:
+            bad.append('%s 实心度 %.2f > %.2f（会被误判成实心族）'
+                       % (p.name, s, THIN_ARM_MAX))
+
+    # ③ 匹配：把模板源图本身当 blob（灰度→暗像素=形）
+    cases = []
+    for p in Path('data/type_glyphs').glob('ban_*.png'):
+        cases.append((p, p.stem[4:].split('_')[0]))
+    # 旗标是**深底浅形**，反相后才是面板的浅底深形
+    flag = np.array(Image.open('data/type_glyphs/驱逐舰.png').convert('L'))
+    ys, xs = np.where(flag > 150)
+    cases.append(((255 - flag[ys.min():ys.max() + 1,
+                             xs.min():xs.max() + 1]).astype('uint8'), '驱逐舰'))
+    for src, want in cases:
+        blob = ((src if isinstance(src, np.ndarray)
+                 else np.array(Image.open(src).convert('L'))) < 150)
+        hit = _match_glyph(blob.astype(np.uint8), tpls)
+        got = hit[1] if hit else None
+        if got != want:
+            bad.append('%s 图标应识别为 %s，实得 %s'
+                       % (getattr(src, 'name', '驱逐舰旗'), want, got))
+    return bad
 
 
 def key_sample_regression():
@@ -153,6 +207,13 @@ def main():
 
     print('\n== 关键样本回归（列宽 / 战力 / 代币 / 禁用舰种 / 减益效果）==')
     fails += key_sample_regression()
+    print('\n== 禁用图标识别自检（模板齐备 / 形体分族 / 匹配选型）==')
+    bu = ban_glyph_unit()
+    for x in bu:
+        print('  FAIL ' + x)
+    if not bu:
+        print('  OK   模板齐备、分族正确、匹配选型全部正确')
+    fails += bu
     if fails:
         print('\n失败明细：')
         for x in fails:
