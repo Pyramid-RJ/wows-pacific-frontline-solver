@@ -831,7 +831,7 @@ def ban_text(c):
         else:
             segs.append('禁用' + '、'.join(tps) + lbl
                         + ('' if r.get('scope') in (None, '区域')
-                           else '，未计入（全胜口径）'))
+                           else '，不生效'))
     return '｜'.join(segs)
 
 

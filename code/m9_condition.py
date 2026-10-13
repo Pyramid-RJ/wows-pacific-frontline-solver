@@ -35,10 +35,11 @@ DATA = str(ROOT / 'data' / 'stage')
 
 import numpy as np
 from PIL import Image
-from m2_layout import load, load_screen, to_gray
+# PANEL_X（面板左边界占宽比）由 m2_layout 定义 —— 卡牌列扫描也要用它排除
+# 面板底面的浅色段，只能有一处实测值。
+from m2_layout import load, load_screen, to_gray, PANEL_X
 
 # ---- 版式常量 ----
-PANEL_X = 0.772        # 面板左边界占宽比（实测 1482/1920 = 0.772）
 EDGE_PAD = 6           # 去掉面板左缘青色装饰条
 COND_Y0 = 0.285        # 条件区上界（占高）
 COND_Y1 = 0.875        # 条件区下界

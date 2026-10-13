@@ -28,6 +28,9 @@ from PIL import Image
 
 # ============ 通用工具 ============
 BASE_W = 1920          # 基准宽度：识别层全部版式常量按此标定
+# 右侧条件面板的左边界占宽比（实测 1482/1920 = 0.772）—— 面板底面也是浅色，
+# 列扫描会把它抓成「段」，必须与卡牌列区分开（见 find_card_columns）。
+PANEL_X = 0.772
 
 def load(path):
     return np.array(Image.open(path).convert('RGB')).astype(int)
@@ -243,6 +246,13 @@ def find_card_columns(a):
                 runs.append((s, x))
     if inr and 40 < W - s < 300:
         runs.append((s, W))
+    # **面板区**（x ≥ 0.772W）的浅色底面也会被列扫描抓成段（实测
+    # PixPin_13-56-17 的第 5 段 248px 就是面板纸面、PixPin_22-13-09 的
+    # 第 5~7 段 136/117/87px 同理）—— 一律不算卡。不剔掉会污染下面的
+    # 「宽度一致性」参考宽度（实测把 136px 的碎段当参考 → 四张卡全被截成
+    # 136px、战力读成 2）。
+    xp = int(W * PANEL_X)
+    runs = [(s, e) for s, e in runs if s < xp]
     if len(runs) > 4:
         wmax = max(e - s for s, e in runs)
         runs = [(s, e) for s, e in runs if e - s >= 0.65 * wmax]
@@ -251,11 +261,16 @@ def find_card_columns(a):
     # → 连成一段把该列撑宽（实测 13-57-57 列2 = 276px、同排其余 209px；
     # 13-59-31 列3 同理）→ 战力 ROI 右移、首位数字被挤出窗口
     # （147→47、126→26），且**静默**不报低置信。
-    # 离群过宽的段按**中位宽**向右截断（多出的部分一律在卡的右侧）。
+    # 离群过宽的段按**参考宽度**向右截断（多出的部分一律在卡的右侧）。
+    #
+    # ⚠ 2026-10-13：参考宽度必须取**最窄**的那一列 —— 徽章只会往列的**右侧**
+    # 加宽、不会让它变窄，所以「真实卡宽 = 观测到的最小宽度」。
+    # 原先用中位宽：一排 4 张里**两张**带徽章时（玩家实拍 阶段2 据点3：
+    # [274, 208, 274, 214]），sorted 后取 `ws[2]`（偶数个取上中位）= **274**
+    # → 阈值 315，一个都没截 → 首位「1」仍被挤出窗口（143 读成 43、149 读成 49）。
     if len(runs) >= 3:
-        ws = sorted(e - s for s, e in runs)
-        wmed = ws[len(ws) // 2]
-        runs = [(s, s + wmed if e - s > wmed * 1.15 else e) for s, e in runs]
+        wmin = min(e - s for s, e in runs)
+        runs = [(s, s + wmin if e - s > wmin * 1.15 else e) for s, e in runs]
     return runs[:4]
 
 
