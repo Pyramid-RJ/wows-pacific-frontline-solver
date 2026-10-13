@@ -38,8 +38,8 @@ import traceback
 from pathlib import Path
 
 APP = '太平洋战线求解器'
-RELEASE = 'v0.2'                      # 发布版本号（与 GitHub Release 标签一致）
-VERSION = '2026-10-13'                # 构建日期
+RELEASE = 'v0.3'                      # 发布版本号（与 GitHub Release 标签一致）
+VERSION = '2026-10-14'                # 构建日期
 
 PAYLOAD_TOP = ('code', 'data', 'doc', 'examples')
 PAYLOAD_FILES = ('README.md', '使用说明.md', 'requirements.txt')
