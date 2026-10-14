@@ -1741,6 +1741,23 @@ def reeval_entry(p):
     return st, wr
 
 
+def drop_equip_note(notes, node_name, pos0, nm):
+    """撤掉某门变项当初的「装…」备注（它被修剪掉之后，那条备注就不再成立）
+
+    实测（玩家 2026-10-14 的报告）：据点 `20-31-42` 位置1 先装了「炮术训练」、
+    随后收官修剪把它卸掉，报告里却仍留着「位置1 装「炮术训练」（次级代币
+    次数 −1）」—— 与实际方案自相矛盾（看着像「算了两个变项只显示一个」）。
+    卸除时一并撤掉该条备注。
+    """
+    if notes is None:
+        return
+    tag = '%s 位置%d 装「%s」' % (node_name, pos0 + 1, nm)
+    for i, x in enumerate(notes):
+        if str(x).startswith(tag):
+            notes.pop(i)
+            return
+
+
 def trim_plan(plan, inv, left, target=TARGET_RATE, notes=None):
     """收官修剪 —— 卸掉**冗余变项**，退还库存 / 次数（plan_variations 第 6 步）
 
@@ -1784,6 +1801,7 @@ def trim_plan(plan, inv, left, target=TARGET_RATE, notes=None):
         if slot == 'std' and left is not None:
             left += 1
         p['trimmed'].append((nm, pos))
+        drop_equip_note(notes, p['nodes']['name'], pos, nm)   # 撤掉过时的「装…」
         return True
 
     for p in plan:
@@ -1804,7 +1822,8 @@ def trim_plan(plan, inv, left, target=TARGET_RATE, notes=None):
 
 # ============ 7. 阶段规划主流程 ============
 def stage_plan(pool, nodes, target=TARGET_RATE, use_local_search=True,
-               save_gold=True, final_stage=True, inv=None, frugal_all=False):
+               save_gold=True, final_stage=True, inv=None, frugal_all=False,
+               hold_gold=False, gold_escape=()):
     """规划一个阶段
 
     倒序贪心预留 + 正序分配：据点按难度**降序**处理，
@@ -1813,6 +1832,17 @@ def stage_plan(pool, nodes, target=TARGET_RATE, use_local_search=True,
     `save_gold`：等级治理（默认开启，`--no-save-gold` 关闭）。
     **两段式**：先试「无 3 级舰（gold）」的受限池，达标就用它（3 级留硬仗）；
     受限池搜不出解或达不到目标 → 退回全池（3 级是最后手段，不牺牲达标）。
+
+    `hold_gold`（用户 2026-10-13 口径）：**关底阶段之前**的阶段置 True ——
+    这些阶段里的**简单/普通据点硬性不参与 3 级舰**，不再「先试受限池、不行
+    就退回全池」。实测那份行动：预留扣掉关底要用的 4 张后，阶段2 前几个据点
+    把能用的非 3 级卡分完，轮到最后一个「简单」据点（敌方 107~121）时受限池
+    撑不住 → 退回全池，**简单关一口气吃掉 4 张金卡**，后面阶段只能拿白卡。
+    困难据点不受此限（3 级本来就是留给硬仗的），但仍会先试受限池。
+    ⚠ 与 `save_gold` 独立：`stage_solve` 的「退回全池重排」会以
+    `save_gold=False` 再算一遍（那是为了不牺牲达标），但**本规则不该被那样
+    绕过** —— 所以它在 fallback 里仍然生效；`--no-save-gold` 由调用方把
+    `hold_gold` 一并置 False。
 
     `final_stage`：当前阶段是否**整局最后一个阶段**。False（后面还有阶段）
     时**所有据点**都先试受限池 —— 末阶段（往往是 BOSS）通常需要满编 3 级舰，
@@ -1838,13 +1868,26 @@ def stage_plan(pool, nodes, target=TARGET_RATE, use_local_search=True,
         # 「省卡」处理 —— 禁 3 级 + 优先不用特殊变项，把资源让给后面的 BOSS。
         governed = save_gold and (frugal_all or node_saves_gold(node)
                                  or not final_stage)
-        if governed:
-            low = pool_without_tiers(remaining)
-            # 受限池必须**真的更小**才值得试（池里没 3 级时两者等价，
-            # 白跑一遍搜索还会让 gold_saved 标记失真）
-            if len(low) >= 4 and len(low) < len(remaining):
+        # 注意 `or hold_gold`：`stage_solve` 的「退回全池重排」会以
+        # save_gold=False 再跑一遍，那时 governed 为假，但**硬规则仍要生效**
+        # （否则简单/普通据点照样吃到 3 级卡 —— 实测就是在这里漏的）
+        low = (pool_without_tiers(remaining)
+               if (governed or hold_gold) else [])
+        # 关底前「只有困难关能用 3 级卡」（用户 2026-10-13 口径）：简单/普通
+        # 据点**硬性**只从受限池里选，不再退回全池。
+        # `gold_escape`：允许「单独放开 3 级卡」的据点名 —— 硬规则下撑不住的
+        # 那几个，由 `stage_solve` 的第二趟给出（达标优先于省卡，只放开这几个）
+        hard_hold = bool(hold_gold and node_saves_gold(node) and len(low) >= 4
+                         and node['name'] not in gold_escape)
+        # 受限池必须**真的更小**才值得试（池里没 3 级时两者等价，
+        # 白跑一遍搜索还会让 gold_saved 标记失真）
+        if governed and len(low) >= 4 and len(low) < len(remaining):
+            pools.append(low)
+        if hard_hold:
+            if not pools:           # 池里本来就没有 3 级 → 受限池 = 全池
                 pools.append(low)
-        pools.append(remaining)
+        else:
+            pools.append(remaining)
         # 低星据点的**特殊变项预算**（4.30，用户口径：低星关卡尽量少用特殊
         # 变项，困难/关底不设限）：简单/普通且非关底的据点，先用「特殊变项
         # 一律不用」（库存里把它们清零）搜一轮 —— 达标就用它，把有限的**关卡
@@ -1877,9 +1920,10 @@ def stage_plan(pool, nodes, target=TARGET_RATE, use_local_search=True,
                           'gold_saved': (cand is not remaining
                                          and len(cand) < len(remaining))}
                 if chosen['gold_saved']:
-                    chosen['gold_save_reason'] = ('difficulty'
-                                                 if node_saves_gold(node)
-                                                 else 'final_stage')
+                    chosen['gold_save_reason'] = (
+                        'hold_gold' if hard_hold
+                        else ('difficulty' if node_saves_gold(node)
+                              else 'final_stage'))
                 if spc_saved and chosen['meets_target']:
                     chosen['spc_saved'] = True   # 该据点没用特殊变项也达标
                 if chosen['meets_target']:
@@ -1902,7 +1946,7 @@ def stage_plan(pool, nodes, target=TARGET_RATE, use_local_search=True,
 
 def stage_solve(pool, nodes, inv, target=TARGET_RATE, uses_max=None,
                 save_gold=True, final_stage=True, use_local_search=True,
-                frugal_all=False):
+                frugal_all=False, hold_gold=False):
     """阶段求解全流程 = `stage_plan` + `plan_variations`（+ 达标兜底）
 
     「等级治理（不动用 3 级舰）」的前提是受限池能达标；但 `search_node`
@@ -1914,35 +1958,64 @@ def stage_solve(pool, nodes, inv, target=TARGET_RATE, uses_max=None,
 
     返回 (plan, skipped, remaining, inv_left, uses_left, notes)。
     """
-    plan, skipped, remaining = stage_plan(
-        pool, nodes, target=target, use_local_search=use_local_search,
-        save_gold=save_gold, final_stage=final_stage, inv=inv,
-        frugal_all=frugal_all)
-    inv_left, uses_left, notes = plan_variations(plan, inv, uses_max,
-                                                 target=target)
-    if not save_gold or not any(not p['meets_target'] for p in plan) \
-            or not any(p.get('gold_saved') for p in plan):
+    def run(gold_escape=frozenset()):
+        """跑一遍完整求解（`gold_escape` = 允许单独放开 3 级卡的据点名）"""
+        plan, skipped, remaining = stage_plan(
+            pool, nodes, target=target, use_local_search=use_local_search,
+            save_gold=save_gold, final_stage=final_stage, inv=inv,
+            frugal_all=frugal_all, hold_gold=hold_gold,
+            gold_escape=gold_escape)
+        inv_left, uses_left, notes = plan_variations(plan, inv, uses_max,
+                                                     target=target)
+        if not save_gold or not any(not p['meets_target'] for p in plan) \
+                or not any(p.get('gold_saved') for p in plan):
+            return _maybe_no_spc(pool, nodes, plan, skipped, remaining,
+                                 inv_left, uses_left, notes, inv, target,
+                                 save_gold, final_stage, use_local_search,
+                                 uses_max, frugal_all, hold_gold,
+                                 gold_escape)
+        # 「退回全池重排」（save_gold=False）只为不牺牲达标，**不该绕过**关底前
+        # 「简单/普通不用 3 级卡」的硬规则 —— hold_gold 照样传下去
+        plan2, skipped2, rem2 = stage_plan(
+            pool, nodes, target=target, use_local_search=use_local_search,
+            save_gold=False, final_stage=final_stage, inv=inv,
+            frugal_all=frugal_all, hold_gold=hold_gold,
+            gold_escape=gold_escape)
+        inv2, left2, notes2 = plan_variations(plan2, inv, uses_max, target=target)
+        if sum(1 for p in plan2 if p['meets_target']) \
+                > sum(1 for p in plan if p['meets_target']):
+            notes2.insert(0, '⚠ 等级治理的结果在实装变项后不达标'
+                          '（同阶段变项库存被其他据点分走）→ 已退回全池重排')
+            return _maybe_no_spc(pool, nodes, plan2, skipped2, rem2,
+                                 inv2, left2, notes2, inv, target,
+                                 save_gold, final_stage, use_local_search,
+                                 uses_max, frugal_all, hold_gold,
+                                 gold_escape)
         return _maybe_no_spc(pool, nodes, plan, skipped, remaining,
                              inv_left, uses_left, notes, inv, target,
                              save_gold, final_stage, use_local_search,
-                             uses_max, frugal_all)
-    plan2, skipped2, rem2 = stage_plan(
-        pool, nodes, target=target, use_local_search=use_local_search,
-        save_gold=False, final_stage=final_stage, inv=inv,
-        frugal_all=frugal_all)
-    inv2, left2, notes2 = plan_variations(plan2, inv, uses_max, target=target)
-    if sum(1 for p in plan2 if p['meets_target']) \
-            > sum(1 for p in plan if p['meets_target']):
-        notes2.insert(0, '⚠ 等级治理的结果在实装变项后不达标'
-                      '（同阶段变项库存被其他据点分走）→ 已退回全池重排')
-        return _maybe_no_spc(pool, nodes, plan2, skipped2, rem2,
-                             inv2, left2, notes2, inv, target,
-                             save_gold, final_stage, use_local_search,
-                             uses_max, frugal_all)
-    return _maybe_no_spc(pool, nodes, plan, skipped, remaining,
-                         inv_left, uses_left, notes, inv, target,
-                         save_gold, final_stage, use_local_search,
-                         uses_max, frugal_all)
+                             uses_max, frugal_all, hold_gold, gold_escape)
+
+    out = run()
+    if not hold_gold:
+        return out
+    # 关底前「只有困难关可用 3 级卡」**只对撑得住的据点生效**：最终方案里若
+    # 还有简单/普通据点没达标（典型是阶段级变项分配把它压下来），只把这几个
+    # 放开重排一遍 —— 与「3 级是最后手段、不牺牲达标」同口径，同时如实点名。
+    # ⚠ 必须放在**最后**：中途某个分支（如「少花特殊变项」复算）都可能改写
+    # 方案，只有看最终结果才靠得住（实测 mygame_s5 阶段3 就是这么漏的）。
+    plan, _sk, _rem, _il, _ul, _n = out
+    weak = sorted({p['nodes']['name'] for p in plan
+                   if not p['meets_target'] and node_saves_gold(p['nodes'])})
+    if not weak:
+        return out
+    out2 = run(frozenset(weak))
+    met = lambda o: sum(1 for p in o[0] if p['meets_target'])   # noqa: E731
+    if met(out2) < met(out):
+        return out
+    out2[5].insert(0, '⚠ %s 在「不含 3 级卡」的卡池里撑不住 → 只对这几个据点'
+                      '放开 3 级卡（其余简单/普通据点仍不使用）' % '、'.join(weak))
+    return out2
 
 
 def _spc_used(plan):
@@ -1952,7 +2025,8 @@ def _spc_used(plan):
 
 def _maybe_no_spc(pool, nodes, plan, skipped, remaining, inv_left, uses_left,
                   notes, inv, target, save_gold, final_stage,
-                  use_local_search, uses_max, frugal_all):
+                  use_local_search, uses_max, frugal_all, hold_gold=False,
+                  gold_escape=frozenset()):
     """「少花特殊变项」整段复算（用户 2026-10-13 口径）
 
     特殊变项**只能靠战斗奖励获得（一次性）**，而卡牌每次行动都会恢复状态
@@ -1971,7 +2045,9 @@ def _maybe_no_spc(pool, nodes, plan, skipped, remaining, inv_left, uses_left,
     p0, sk0, rem0 = stage_plan(pool, nodes, target=target,
                                use_local_search=use_local_search,
                                save_gold=save_gold, final_stage=final_stage,
-                               inv=inv0, frugal_all=frugal_all)
+                               inv=inv0, frugal_all=frugal_all,
+                               hold_gold=hold_gold,
+                               gold_escape=gold_escape)
     i0, u0, n0 = plan_variations(p0, inv, uses_max, target=target)
     met = lambda pl: sum(1 for p in pl if p['meets_target'])   # noqa: E731
     if met(p0) >= met(plan) and 0 <= _spc_used(p0) < _spc_used(plan):
@@ -2004,9 +2080,10 @@ def format_plan(plan, pool, remaining, nodes, inp, uses_max, uses_left,
         if n.get('difficulty_label'):
             flags.append(n['difficulty_label'])
         if p.get('gold_saved'):
-            flags.append('等级治理·未动用3级舰'
-                         if p.get('gold_save_reason') != 'final_stage'
-                         else '末阶段预留·未动用3级舰')
+            flags.append({
+                'hold_gold': '关底前·非困难据点禁用3级舰',
+                'final_stage': '末阶段预留·未动用3级舰',
+            }.get(p.get('gold_save_reason'), '等级治理·未动用3级舰'))
         if n['is_progress']:
             flags.append('进度代币据点')
         c = n.get('cond') or {}
@@ -2658,15 +2735,28 @@ def plan_all_stages(fleet, inp, damaged0, nodes, target=TARGET_RATE,
         inv, inv_src = stage_inventory(nodes_st, inp_st, slot_names)
         return nodes_st, inp_st, inv, inv_src
 
+    # --- 关底预留：先把关底阶段单独算一遍，取它要用的卡 ---
+    boss_stages = sorted({int(n['stage']) for n in nodes
+                          if n.get('is_progress')})
+
+    def hold_gold_for(st):
+        """该阶段是否受「关底前只有困难关能用 3 级卡」硬规则（用户 2026-10-13）
+
+        = 它**不是关底阶段**、但后面还有关底阶段。关底阶段本身沿用旧偏好
+        （简单/普通先试受限池、撑不住可退回全池 —— 实测那些行动的关底阶段
+        都只有关底那一关，且它必是困难，规则不生效）。`--no-save-gold`
+        （save_gold=False）时整条等级治理关掉，本规则一并关。
+        """
+        return bool(save_gold and st not in boss_stages
+                    and any(b > st for b in boss_stages))
+
     def solve_stage(st, pool, inv, frugal=False):
         return stage_solve(
             pool, groups[st], inv, target=target, uses_max=uses_max,
             save_gold=save_gold, final_stage=(st == total),
-            use_local_search=not no_local, frugal_all=frugal)
+            use_local_search=not no_local, frugal_all=frugal,
+            hold_gold=hold_gold_for(st))
 
-    # --- 关底预留：先把关底阶段单独算一遍，取它要用的卡 ---
-    boss_stages = sorted({int(n['stage']) for n in nodes
-                          if n.get('is_progress')})
     frozen, reserved = {}, {}
     if boss_reserve and boss_stages:
         for st in boss_stages:
@@ -2722,6 +2812,20 @@ def plan_all_stages(fleet, inp, damaged0, nodes, target=TARGET_RATE,
             if hold:
                 notes.append('本阶段禁用了关底预留的 %d 张卡'
                              '（保证关底满血可用）' % len(hold))
+            if hold_gold_for(st):
+                # 说清楚这一步的口径与代价：简单/普通据点硬性不碰 3 级卡，
+                # 若因此没算出目标胜率，提示可以怎么放开
+                notes.append('本阶段的**简单/普通**据点不使用 3 级卡'
+                             '（金卡留给困难据点与关底）')
+                hardbad = [p['nodes']['name'] for p in plan
+                           if not p.get('meets_target')
+                           and (p['nodes'].get('difficulty_label') or '')
+                           in SAVE_GOLD_LABELS]
+                if hardbad:
+                    notes.append('⚠ %s 在「不含 3 级卡」的卡池里没算出目标'
+                                 '胜率 —— 该限制由「关底前只有困难关可用 '
+                                 '3 级卡」带来；如需放开请加 `--no-save-gold`'
+                                 % '、'.join(hardbad))
             results[st] = {'plan': plan, 'skipped': skipped,
                            'remaining': remaining, 'uses_left': uses_left,
                            'notes': notes, 'var_status': var_status,

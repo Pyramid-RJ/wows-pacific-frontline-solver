@@ -24,7 +24,8 @@ from m11_plan import (HP_MAX, TARGET_RATE, power_from_stats, build_pool,
                       save_state, load_state, snapshot_of, rollback,
                       list_snapshots, load_player_input, apply_banned_types,
                       normalize_variations, stage_inventory, var_stock_ok,
-                      INV_SRC_BAR, INV_SRC_INPUT, INV_SRC_NONE)
+                      INV_SRC_BAR, INV_SRC_INPUT, INV_SRC_NONE,
+                      drop_equip_note, stage_solve)
 
 ROOT = Path(__file__).resolve().parent.parent
 FAIL = []
@@ -612,6 +613,67 @@ def t_boss_reserve():
     ck(res2[1]['plan'][0]['meets_target'],
        '关底不可能达标时不做预留：阶段1 那个必须用金卡的据点仍能达标（%s）'
        % sorted(c['id'] for c in res2[1]['plan'][0]['cards']))
+
+
+def t_hold_gold():
+    print()
+    print('== 9d. 关底前「只有困难关能用 3 级卡」（用户 2026-10-14 口径） ==')
+    # 场景：非关底阶段里两个普通据点 + 一个困难据点
+    #   easy_low  敌方 90  —— 不用金卡也够
+    #   easy_high 敌方 195 —— 非金卡最强 155，**必须**靠金卡（3 级是最后手段）
+    #   hard      敌方 195 —— 困难据点本来就可用 3 级卡
+    # 8 张弱卡（150）+ 8 张金卡（210）：三个据点共 12 个槽 —— 「撑不住的那两个」
+    # 各要 4 张金卡，弱卡留给够用的据点，卡池刚好够，断言才稳定
+    fleet = ([mkcard(i, [45, 45, 45]) for i in range(1, 9)]
+             + [mkcard(i, [70, 70, 70]) for i in range(90, 98)])
+    for c in fleet:
+        c['tier'] = 'gold' if c['id'] >= 90 else 'blue'
+    # ⚠ 敌方别选得太低：实测「卡池战力远高于敌方」时 search_node 会返回 None
+    #（该据点被跳过）—— 那是另一处待查的行为，这里用 110 避开它
+    nodes = [mknode('easy_low', [110] * 4), mknode('easy_high', [195] * 4),
+             mknode('hard', [195] * 4)]
+    for n, i, lab in zip(nodes, (1, 2, 3), ('普通', '普通', '困难')):
+        n['stage'], n['node'], n['difficulty_label'] = 1, i, lab
+
+    def gold_of(plan, nm):
+        p = next((x for x in plan if x['nodes']['name'] == nm), None)
+        return None if p is None else sorted(
+            c['id'] for c in p['cards'] if str(c.get('tier')).lower() == 'gold')
+
+    pool = build_pool(fleet, [], {})[0]
+    # ① 关底前（hold_gold=True）：撑得住的普通据点不吃金卡；撑不住的单独放开
+    plan, _sk, _rem, _il, _ul, notes = stage_solve(
+        pool, nodes, {}, target=1.0, uses_max=0, save_gold=True,
+        final_stage=False, use_local_search=False, hold_gold=True)
+    ck(gold_of(plan, 'easy_low') == [],
+       '关底前的普通据点（够用）不吃 3 级卡（%s）' % (gold_of(plan, 'easy_low'),))
+    ck(gold_of(plan, 'easy_high') != [],
+       '关底前的普通据点（不够用）**单独放开** 3 级卡 → 仍能达标（%s）'
+       % (gold_of(plan, 'easy_high'),))
+    ck(any('放开 3 级卡' in x for x in notes),
+       '报告里点名「只对这几个据点放开 3 级卡」')
+    ck(gold_of(plan, 'hard') != [],
+       '关底前的困难据点仍可用 3 级卡（%s）' % (gold_of(plan, 'hard'),))
+    ck(all(p.get('meets_target') for p in plan), '三个据点都达标（不牺牲达标）')
+
+    # ② 旧行为（hold_gold=False）：普通据点退回全池、动用金卡
+    plan2, _sk2, _r2, _i2, _u2, _n2 = stage_solve(
+        pool, nodes, {}, target=1.0, uses_max=0, save_gold=True,
+        final_stage=False, use_local_search=False, hold_gold=False)
+    ck(gold_of(plan2, 'easy_high') != [],
+       '旧行为：关底前的普通据点也会吃金卡（%s —— 本次收紧的就是它）'
+       % (gold_of(plan2, 'easy_high'),))
+
+    # ③ 修剪掉变项后，那条「装…」备注必须一起撤（否则报告自相矛盾）
+    ns = ['n 位置1 装「炮术训练」（次级代币次数 −1，余 不限）',
+          'n 位置2 装「炮术训练」（次级代币次数 −1，余 不限）',
+          '与变项无关的说明']
+    drop_equip_note(ns, 'n', 0, '炮术训练')
+    ck(len(ns) == 2 and '位置1 装' not in ''.join(ns)
+       and '位置2 装' in ''.join(ns),
+       '修剪后撤掉对应那条「装…」备注，别的备注不动（%d 条）' % len(ns))
+    drop_equip_note(None, 'n', 0, '炮术训练')     # notes=None 不应崩
+    ck(True, 'notes=None 时安全返回')
 
 
 def t_cond_types():
@@ -1643,7 +1705,7 @@ def main():
               t_snapshots, t_pool, t_varconfig,
               t_stage_plan, t_variations, t_local_search, t_json_out,
               t_html_panel, t_input_editor, t_all_stages, t_boss_reserve,
-              t_cond_types,
+              t_hold_gold, t_cond_types,
               t_banned_input, t_var_input, t_disabled_var,
               t_final_stage_reserve, t_std_variation, t_cond_display,
               t_scenario_search, t_disabled_all, t_efficiency_drop,
