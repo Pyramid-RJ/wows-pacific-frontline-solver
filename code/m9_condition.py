@@ -237,7 +237,58 @@ def _scope_above(cond, y):
     return best[0] if best else None
 
 
-def _read_ban_row(panel, cond, anchor):
+def native_panel(path, base_w=1920):
+    """原生分辨率面板 → (面板 ndarray, 倍率)；读不出 / 与基准同尺度 → (None, 1.0)
+
+    禁用图标（`_read_ban_row`）**必须**在原生像素上量：归一化到 1920 会把
+    旗形上的 1 像素斜纹糊掉，`_solidity` 随之从 0.51 掉到 0.39 —— 正好跌破
+    `SOLID_ARM_MIN`，「形体」「斜纹」两层闸门被**静默跳过**，只剩 24x24 拉伸
+    后的 IoU 说话，而拉伸会把 1 道与 2 道斜纹抹平 → **战列舰被读成巡洋舰**
+    （实测 TANGO 02-10-52：原生 IoU 战列舰 0.98 ＞ 巡洋舰 0.81，归一化后
+    反而 0.78 ＜ 0.86）。同一枚图标在 mygame_s1 恰好 0.45（≥ 阈值）读对、
+    在 TANGO 0.39 读错 —— 刀尖上的判据，必须在原生尺度上量。
+
+    倍率 = 原生宽 / 基准宽（`load_screen` 两轴等比缩放），归一化面板坐标 ×
+    倍率即原生坐标。
+    """
+    try:
+        from PIL import Image
+        im = Image.open(path).convert('RGB')
+        w, h = im.size
+        if not w or abs(w - base_w) <= base_w * 0.01:
+            return None, 1.0            # 已是基准尺度，归一化像素即原生像素
+        return panel_crop(np.array(im).astype(int)), w / float(base_w)
+    except Exception:
+        return None, 1.0
+
+
+def _native_ban_crop(nat, panel, band_xy, gy0, b, scale):
+    """归一化面板上的 blob bbox → **原生裁图**（紧裁到图标本体）
+
+    几何仍按归一化面板判（阈值都按基准尺度标定）；只把像素来源换成原生 ——
+    归一化掩膜可能比本体矮 1 像素（细斜纹行被判成空白），故左右上下各放
+    1 像素余量再紧裁，避免把斜纹切掉。余量可能带进邻图一角，取最大那块。
+    """
+    from m2_layout import connected_boxes
+    x0b, y0b = band_xy
+    bx0 = int(round((x0b + b[0]) * scale)) - 1
+    by0 = int(round((y0b + gy0 + b[1]) * scale)) - 1
+    bx1 = int(round((x0b + b[2]) * scale)) + 1
+    by1 = int(round((y0b + gy0 + b[3]) * scale)) + 1
+    sub = nat[max(0, by0):by1, max(0, bx0):bx1]
+    if sub.size == 0:
+        return None
+    m = (to_gray(sub) < 150).astype(np.uint8)
+    boxes = connected_boxes(m, min_px=8)
+    if not boxes:
+        return None
+    bb = max(boxes, key=lambda t: (t[2] - t[0]) * (t[3] - t[1]))
+    if bb[2] - bb[0] < 4 or bb[3] - bb[1] < 3:
+        return None
+    return m[bb[1]:bb[3], bb[0]:bb[2]]
+
+
+def _read_ban_row(panel, cond, anchor, native=None, scale=1.0):
     """**一行**「禁用的单位类型」→ (舰种列表, 提示, 该条目所属分区)
 
     图标**没有文字**，只能按图标识别：定位含「单位类型」的锚文本行，其**下方
@@ -245,6 +296,10 @@ def _read_ban_row(panel, cond, anchor):
     锚文本与图标行之间有空隙，整带提取会把文本笔画混进来。
     scope = 该条目**上方最近的分区标题**（带入/区域/指定/全场/全域），见
     `_scope_above`；一个据点可以有多行（见 `_read_ban_rows`）。
+
+    `native`/`scale`：原生分辨率面板与倍率（见 `native_panel`）。给了就
+    **用原生像素做图标匹配**（形体/斜纹判据按原生尺度标定，见 `native_panel`）；
+    不给则退回归一化像素（旧行为，尺度偏差下判据在刀尖上）。
     """
     tpls = _glyph_templates()
     if not tpls:
@@ -282,6 +337,13 @@ def _read_ban_row(panel, cond, anchor):
             continue
         n_blob += 1
         crop = dark[gy0 + b[1]:gy0 + b[3], b[0]:b[2]]
+        if native is not None:
+            # 图标匹配改用**原生像素**（见 native_panel）—— 归一化尺度下
+            # 斜纹/实心度都在刀尖上；原生裁不出就退回归一化裁图
+            nc = _native_ban_crop(native, panel, (x0, int(anchor['y']) + 4),
+                                  gy0, b, scale)
+            if nc is not None:
+                crop = nc
         hit = _match_glyph(crop, tpls)      # 含「形体」「斜纹」两层闸门
         if hit:
             pairs.append((hit[0], b[0], hit[1], crop))
@@ -308,7 +370,7 @@ def _read_ban_row(panel, cond, anchor):
     return sorted(set(out)), review, bscope
 
 
-def _read_ban_glyphs(panel, cond):
+def _read_ban_glyphs(panel, cond, native=None, scale=1.0):
     """兼容入口：只读**第一行** → (ban_types, review, ban_scope)
 
     生产路径已改走 `_read_ban_rows`（多行）；这个单行版本留给
@@ -317,10 +379,10 @@ def _read_ban_glyphs(panel, cond):
     anchor = next((i for i in cond if '单位类型' in i['text']), None)
     if anchor is None:
         return [], [], None
-    return _read_ban_row(panel, cond, anchor)
+    return _read_ban_row(panel, cond, anchor, native=native, scale=scale)
 
 
-def _read_ban_rows(panel, cond):
+def _read_ban_rows(panel, cond, native=None, scale=1.0):
     """面板上**每一行**「禁用的单位类型」→ ([{'scope','types'}], review)
 
     ⚠ 2026-10-13 修（玩家实拍：阶段3 据点7）：一个据点可以有**多行**禁用条目
@@ -330,10 +392,13 @@ def _read_ban_rows(panel, cond):
 
     行归属仍是「上方最近的分区标题」，每行独立判断；**是否生效**由
     `ban_effective` 按「只认区域」口径决定。
+
+    `native`/`scale` 透传给 `_read_ban_row`（原生像素做图标匹配）。
     """
     rows, review = [], []
     for anchor in (i for i in cond if '单位类型' in i['text']):
-        types, notes, sc = _read_ban_row(panel, cond, anchor)
+        types, notes, sc = _read_ban_row(panel, cond, anchor,
+                                         native=native, scale=scale)
         rows.append({'scope': sc, 'types': types})
         review.extend(notes)
     return rows, review
@@ -733,7 +798,10 @@ def parse(path, ocr=True):
     # （与「禁用变项」ban_item 是两回事）。一个据点可有**多行**（带入/区域/
     # 指定各一行），逐行读、逐行归属分区；只有「区域」行拦人（4.28），
     # 但每行都记下来（`ban_rows`）供显示与人工核对。
-    ban_rows, ban_review = _read_ban_rows(panel, cond)
+    # ⚠ 图标在**原生像素**上匹配：归一化到 1920 会让实心度/斜纹条数落到
+    #   闸门边界外 → 读错舰种（见 `native_panel`）。
+    nat, nsc = native_panel(path)
+    ban_rows, ban_review = _read_ban_rows(panel, cond, native=nat, scale=nsc)
     out['ban_rows'] = ban_rows
     out['ban_types'] = ban_effective(ban_rows)
     out['ban_scope'] = ban_scope_label(ban_rows)

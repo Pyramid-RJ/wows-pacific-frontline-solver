@@ -177,6 +177,24 @@ for (const n of D.nodes){
     ((c.disabled_variations && c.disabled_variations.length)
       ? '（禁用：' + c.disabled_variations.join('、') + '）'
       : '（未填具体变项，按不禁用处理）'));
+  // 禁用舰种（「禁用的单位类型」是**图标**，与 m11.ban_text 同一套口径）：
+  // 逐行列出并标注是否拦人 —— 只列生效行会让玩家以为另一行漏读，只列全部
+  // 又说不清哪行拦人。面板此前**整个不显示**这一条：识别对了也看不出来
+  // （实测玩家据此判定「未识别到禁用战舰类型」）。
+  const br = c.ban_rows || [];
+  if (br.length){
+    parts.push(br.map(r => {
+      const tp = (r.types && r.types.length) ? r.types.join('、') : null;
+      const lbl = r.scope ? '（' + r.scope + ' 段）' : '';
+      const eff = (r.scope === null || r.scope === undefined
+                   || r.scope === '区域');
+      return tp ? '禁用' + tp + lbl + (eff ? '' : '，不生效')
+                : '禁用舰种未识别出' + lbl;
+    }).join('｜'));
+  } else if (c.ban_types && c.ban_types.length){
+    parts.push('禁用' + c.ban_types.join('、') +
+      (c.ban_scope ? '（' + c.ban_scope + ' 段）' : ''));
+  }
   if (parts.length){
     let line = '战斗条件：' + parts.join(' · ');
     if (c.quantified) line += '（<span class="inc">已计入胜率</span>）';
