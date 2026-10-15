@@ -900,6 +900,55 @@ def has_cond(node):
     return bool(cond_pct(node)) or bool(cond_all_pct(node))         or bool(cond_buff_suppress(node)) or bool(cond_debuff_scale(node))
 
 
+def cond_pairs_by_scope(node):
+    """条件逐条 → 按作用域分组 + 被忽略的作用域
+
+    → ([(作用域标签, ['火力 -24%', ...]), ...], ['带入', '指定', ...])
+
+    **唯一实现**：命令行报告（format_plan）与 `plan_to_json`（面板）共用。
+    m9 的单值 `attr` / `scope` 取的是「合并文本里第一个属性名」与「第一个
+    作用域名」，两者来自**不同分节**，可能是错配；折算（`cond_pct`）以
+    `our_pairs` 为准，**显示必须跟上**，否则展示与计算自相矛盾（实测
+    TANGO 02-11-59：面板显示「区域 · 存活性 -12%」，实际折算的是
+    「区域 · 火力 -24%」—— 玩家据此报「区域火力 -24% 未识别到」）。
+    """
+    c = node.get('cond') or {}
+    order, grp, ignored = [], {}, []
+    for pr in (c.get('our_pairs') or []):
+        a, pc, sc = pr.get('attr'), pr.get('pct'), pr.get('scope')
+        if not a or pc is None:
+            continue
+        k = sc or '作用域未读出'
+        if k not in grp:
+            grp[k] = []
+            order.append(k)
+        grp[k].append('%s %+d%%' % (a, pc))
+        if sc not in (None, '区域') and sc not in ignored:
+            ignored.append(sc)
+    return [(k, grp[k]) for k in order], ignored
+
+
+def cond_effective(node):
+    """**实际折算进胜率**的项 → [{'attr', 'pct', 'note'?}]
+
+    **唯一实现**：命令行报告与面板共用 —— 标注必须来自实际折算结果
+    （`cond_pct` / `cond_all_pct` / `cond_buff_suppress` / `cond_debuff_scale`），
+    不能照显示的单值说（否则又会出现「显示 区域·存活性 −12% 但实际折算 {}」）。
+    """
+    out = [{'attr': a, 'pct': round(v * 100)}
+           for a, v in sorted(cond_pct(node).items())]
+    ap, bv = cond_all_pct(node), cond_buff_suppress(node)
+    if ap:
+        out.append({'attr': '战力', 'pct': round(ap * 100)})
+    if bv:
+        out.append({'attr': '增益效果', 'pct': round(bv * 100)})
+    dv = cond_debuff_scale(node)
+    if dv:
+        out.append({'attr': '减益效果', 'pct': round(dv * 100),
+                    'note': '我方减益强度 ×%.2f' % (1.0 + dv)})
+    return out
+
+
 def eval_cards(cards, node, debuff_x2=False, teamwork=False,
                attr_idx=None, attr_pct=0.0, all_pct=0.0,
                disable_effects=False, ignore_conditions=False,
@@ -2089,28 +2138,17 @@ def format_plan(plan, pool, remaining, nodes, inp, uses_max, uses_left,
         c = n.get('cond') or {}
         prs = c.get('our_pairs') or []
         parts = []
-        ignored_scopes = []
+        # 逐条按 pairs 显示（作用域分组）。m9 的单值 attr/pct 可能是**错配**
+        # —— `attr` 取合并文本里第一个属性名、`scope` 取第一个作用域名，
+        # 两者来自**不同分节**（实测据点13：「带入：存活性 −12%…」被错配成
+        # 「区域 · 存活性 −12%」）。折算口径（cond_pct）以 pairs 为准，
+        # 显示必须跟上，否则展示与计算自相矛盾。分组逻辑见
+        # `cond_pairs_by_scope`（与 plan_to_json 的面板字段同一实现）。
+        groups, ignored_scopes = cond_pairs_by_scope(n)
         if prs:
-            # 逐条按 pairs 显示（作用域分组）。m9 的单值 attr/pct 可能是**错配**
-            # —— `attr` 取合并文本里第一个属性名、`scope` 取第一个作用域名，
-            # 两者来自**不同分节**（实测据点13：「带入：存活性 −12%…」被错配成
-            # 「区域 · 存活性 −12%」）。折算口径（cond_pct）以 pairs 为准，
-            # 显示必须跟上，否则展示与计算自相矛盾。
-            order, grp = [], {}
-            for pr in prs:
-                a, pc, sc = pr.get('attr'), pr.get('pct'), pr.get('scope')
-                if not a or pc is None:
-                    continue
-                k = sc or '作用域未读出'
-                if k not in grp:
-                    grp[k] = []
-                    order.append(k)
-                grp[k].append('%s %+d%%' % (a, pc))
-                if sc not in (None, '区域') and sc not in ignored_scopes:
-                    ignored_scopes.append(sc)
-            if order:
-                parts.append(' ｜ '.join('%s：%s' % (k, '、'.join(grp[k]))
-                                        for k in order))
+            if groups:
+                parts.append(' ｜ '.join('%s：%s' % (k, '、'.join(v))
+                                        for k, v in groups))
         else:
             if c.get('scope'):
                 parts.append(c['scope'])
@@ -2136,17 +2174,9 @@ def format_plan(plan, pool, remaining, nodes, inp, uses_max, uses_left,
             # 标注必须来自**实际折算结果**（cond_pct / cond_all_pct /
             # cond_buff_suppress），不能照显示的单值说 —— 否则又会出现
             # 「显示 区域·存活性−12% 但实际折算 {}」这类自相矛盾。
-            eff = ['%s %+d%%' % (a, round(v * 100))
-                   for a, v in sorted(cond_pct(n).items())]
-            ap, bv = cond_all_pct(n), cond_buff_suppress(n)
-            if ap:
-                eff.append('战力 %+d%%' % round(ap * 100))
-            if bv:
-                eff.append('增益效果 %+d%%' % round(bv * 100))
-            dv = cond_debuff_scale(n)
-            if dv:
-                eff.append('减益效果 %+d%%（我方减益强度 ×%.2f）'
-                           % (round(dv * 100), 1.0 + dv))
+            eff = ['%s %+d%%' % (e['attr'], e['pct'])
+                   + ('（%s）' % e['note'] if e.get('note') else '')
+                   for e in cond_effective(n)]
             if eff:
                 cond += '（已计入胜率：%s）' % '、'.join(eff)
                 if ignored_scopes:
@@ -2417,7 +2447,15 @@ def plan_to_json(inp, plan, remaining, uses_max, uses_left, notes,
                           'pairs': [{'attr': pr.get('attr'),
                                      'pct': pr.get('pct'),
                                      'scope': pr.get('scope')}
-                                    for pr in (c.get('our_pairs') or [])]},
+                                    for pr in (c.get('our_pairs') or [])],
+                          # 新增可选字段（2026-10-16）：**实际折算进胜率**的项
+                          # [{'attr','pct','note'?}] 与按全胜口径忽略的作用域。
+                          # 与命令行报告同一实现（m11.cond_effective /
+                          # cond_pairs_by_scope）—— 面板显示必须照这个说，不能
+                          # 照单值说（实测 TANGO 02-11-59：单值显示「区域·存活性
+                          # -12%」，实际折算的是「区域·火力 -24%」，玩家以为漏读）。
+                          'applied': cond_effective(n),
+                          'ignored_scopes': cond_pairs_by_scope(n)[1]},
             'weak': [sorted(w) for w in n['weak']],
             'progress_tokens': n['progress_tokens'],
             'is_progress': bool(n['is_progress']),

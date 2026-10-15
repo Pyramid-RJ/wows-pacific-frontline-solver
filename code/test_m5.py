@@ -355,9 +355,17 @@ def t_json_out():
                            # 可有多行 带入/区域/指定，拦人的只有区域行；
                            # `ban_types` 已是那部分）。该据点无禁用条目 → []
                            'ban_rows': [],
-                           'quantified': True, 'pairs': []},
+                           'quantified': True, 'pairs': [],
+                           # 2026-10-16 新增：**实际折算进胜率**的项与按全胜
+                           # 口径忽略的作用域（与命令行报告同一实现
+                           # m11.cond_effective / cond_pairs_by_scope）。面板
+                           # 显示必须照这个说，不能照单值 attr/pct/scope 说 ——
+                           # 单值可能是 m9 的错配（实测 02-11-59：单值显示
+                           # 「区域·存活性 -12%」，实际折算的是「区域·火力 -24%」）
+                           'applied': [{'attr': '存活性', 'pct': -24}],
+                           'ignored_scopes': []},
        '条件字段（quantified=True；含新增可选字段 pairs / disabled_all / '
-       'ban_rows）')
+       'ban_rows / applied / ignored_scopes）')
     ck(nd['progress_tokens'] == 1000 and nd['is_progress'], '进度代币字段')
 
     a = nd['assignment'][0]
@@ -1212,6 +1220,30 @@ def t_cond_display():
     ck('带入：存活性 -12%、机动性 -12%、增益效果 -100%' in txt2
        and '（带入 条件按全胜口径忽略，未计入）' in txt2,
        '折算为空时标注「按全胜口径忽略」，与计算一致')
+
+    # ---- 面板（plan/v1 字段）与命令行**同一口径** ----
+    # 面板渲染的 JS 没法在这里单测，所以锁它**渲染所依赖的字段**：
+    # 单值是错配的（区域·存活性 −12%），pairs/applied/ignored_scopes 才是真值。
+    # 漏了这一步，面板就会照单值显示（实测 02-11-59：玩家看到「区域·存活性
+    # −12%」，而实际折算的是「区域·火力 −24%」→ 报「火力 −24% 未识别到」）。
+    from m11_plan import plan_to_json
+    node3 = mknode('nd3', [120] * 4)
+    node3['cond'] = dict(node['cond'])
+    st3, wr3 = eval_cards(pool, node3)
+    p3 = {'cards': pool, 'nodes': node3, 'std': [], 'spc': [],
+          'win_rates': wr3, 'stats': st3, 'meets_target': True,
+          'efficiency': False, 'teamwork': False}
+    doc3 = plan_to_json({'current': 1, 'total': 1, 'missing': []}, [p3],
+                        pool, 5, 5, [])
+    c3 = doc3['nodes'][0]['condition']
+    ck([(p['scope'], p['attr'], p['pct']) for p in c3['pairs']]
+       == [('带入', '存活性', -12), ('带入', '机动性', -12),
+           ('带入', '增益效果', -100), ('区域', '火力', -24)],
+       'plan/v1 的 pairs 逐条带作用域（面板按它分组显示）')
+    ck(c3['applied'] == [{'attr': '火力', 'pct': -24}],
+       'plan/v1 的 applied = 实际折算结果（不是单值）')
+    ck(c3['ignored_scopes'] == ['带入'],
+       'plan/v1 的 ignored_scopes = 按全胜口径忽略的分区')
 
 
 def t_scenario_search():

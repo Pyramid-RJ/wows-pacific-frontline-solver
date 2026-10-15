@@ -170,8 +170,25 @@ for (const n of D.nodes){
   // 条件
   const c = n.condition;
   const parts = [];
-  if (c.scope) parts.push(c.scope);
-  if (c.attr) parts.push(c.attr + ' ' + c.pct + '%%');
+  // 逐条按作用域分组显示（与命令行同一口径，见 m11.cond_pairs_by_scope）。
+  // 单值 scope/attr 可能是 m9 的**错配**（各取合并文本里的第一个，来自不同
+  // 分节）—— 照单值显示会凭空造出一条不存在的条件（实测 02-11-59：单值显示
+  // 「区域 · 存活性 −12％」，而实际折算的是「区域 · 火力 −24％」，玩家据此报
+  // 「区域火力 −24％ 未识别到」）。pairs 缺失（旧 plan.json）时才退回单值。
+  const prs = c.pairs || [];
+  const order = [], grp = {};
+  for (const p of prs){
+    if (!p.attr || p.pct === null || p.pct === undefined) continue;
+    const k = p.scope || '作用域未读出';
+    if (!grp[k]) { grp[k] = []; order.push(k); }
+    grp[k].push(p.attr + ' ' + (p.pct > 0 ? '+' : '') + p.pct + '%%');
+  }
+  if (order.length)
+    parts.push(order.map(k => k + '：' + grp[k].join('、')).join(' ｜ '));
+  else {
+    if (c.scope) parts.push(c.scope);
+    if (c.attr) parts.push(c.attr + ' ' + c.pct + '%%');
+  }
   if (c.directive) parts.push('「' + c.directive + '」');
   if (c.ban_item) parts.push('禁用变项' +
     ((c.disabled_variations && c.disabled_variations.length)
@@ -197,10 +214,23 @@ for (const n of D.nodes){
   }
   if (parts.length){
     let line = '战斗条件：' + parts.join(' · ');
-    if (c.quantified) line += '（<span class="inc">已计入胜率</span>）';
-    else if (c.attr && c.pct === null)
+    // 折算标注来自 plan_to_json 的 applied / ignored_scopes（= 求解器实际
+    // 折进胜率的那几项），不照单值说
+    const ap = c.applied || [], ig = c.ignored_scopes || [];
+    const apz = ap.map(e => e.attr + ' ' + (e.pct > 0 ? '+' : '') + e.pct + '%%' +
+      (e.note ? '（' + e.note + '）' : '')).join('、');
+    if (ap.length){
+      line += '（<span class="inc">已计入胜率：' + apz + '</span>）';
+      if (ig.length) line += '（' + ig.join('/') + ' 条件按全胜口径忽略）';
+    } else if (ig.length){
+      line += '（' + ig.join('/') + ' 条件按全胜口径忽略，未计入）';
+    } else if (c.quantified){
+      line += '（<span class="inc">已计入胜率</span>）';
+    } else if (c.attr && c.pct === null){
       line += '（未读到百分比，未计入 —— 需人工确认）';
-    card.appendChild(el('div', 'cond' + (c.quantified?' warn':''), line));
+    }
+    card.appendChild(el('div', 'cond' + (ap.length || c.quantified
+                                        ? ' warn' : ''), line));
   }
   // 变项不再在据点级平铺 —— 已挂到「装它的那条船」上（编队表「我方」列内），
   // 使用对象一眼可见；标准/特殊由 chip 颜色区分（绿=标准，浅绿带框=特殊）
